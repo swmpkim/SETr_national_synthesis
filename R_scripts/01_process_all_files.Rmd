@@ -1,0 +1,122 @@
+---
+title: "National SET Outputs"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(here)
+library(nlme)
+```
+
+
+Find and list the raw files.  
+
+```{r}
+raw_path <- here::here("data", "raw_reserve_level")
+raw_files <- dir(raw_path, pattern = "set.xls")
+```
+
+
+Process them and output them to the `processed_reserve_level` directory.  
+
+```{r}
+processed_path <- here::here("data", "processed_reserve_level")
+sourced_path <- here::here("R_scripts", "sourced")
+processing_script <- paste0(sourced_path, "/01_natl_process_raw_data.R")
+
+# for each raw file, source the processing script
+for(i in seq_along(raw_files)){
+        file_path <- paste0(raw_path, "/", raw_files[i])
+        source(processing_script)
+        message(paste("\n", file_out, "\nhas been produced \n"))
+}
+
+message("\n \nFinished with file processing \n")
+```
+
+
+
+Now read them all in and combine them into one big file.  
+
+```{r}
+processed_files <- dir(processed_path, pattern = "processed.csv")
+
+processed_list <- list()
+
+for(i in seq_along(processed_files)){
+        # read in file
+        file_path <- paste0(processed_path, "/", processed_files[i])
+        dat <- read.csv(file_path, stringsAsFactors = FALSE)
+        
+        # if there isn't a column for reserve, pull it from the file name
+        if(!exists("reserve", dat)){
+                reserve <- substr(processed_files[i], 1, 3)
+                dat$reserve <- toupper(reserve)
+        }
+        
+        # select only the common columns for this project
+        dat <- dat %>% 
+                mutate_at(c("reserve", "set_id", "arm_position"), as.character) %>% 
+                select(reserve,
+                       set_id, 
+                       year, month, day, 
+                       arm_position, 
+                       arm_qaqc_code, 
+                       pin_number, 
+                       starts_with("height"),    # get either mm or cm
+                       qaqc_code)
+        processed_list[[i]] <- dat
+}
+```
+
+
+See the names in all the files.  
+
+```{r}
+purrr::map(processed_list, ~names(.x))
+```
+
+Bind them into one data frame.  
+
+```{r}
+dat_all <- bind_rows(processed_list)
+
+glimpse(dat_all)
+
+unique(dat_all$set_id)
+```
+
+
+Get all of the pin heights into mm and get rid of anything where date doesn't exist.
+
+```{r}
+dat_all2 <- dat_all %>% 
+        mutate(pin_height = case_when(!is.na(height_mm) ~ height_mm,
+                                      !is.na(height_cm) ~ 10 * height_cm),
+               date = ymd(paste(year, month, day, sep = "\\/")),
+               date2 = decimal_date(date),
+               arm_pin = paste0(arm_position, "-", pin_number)) %>% 
+        select(-starts_with("height")) %>% 
+        filter(!is.na(date))
+```
+
+Write out to a csv for later use.  
+
+```{r}
+out_path <- here::here("data", "processed_combined", "all_sites.csv")
+write.csv(dat_all2, out_path, row.names = FALSE)
+```
+

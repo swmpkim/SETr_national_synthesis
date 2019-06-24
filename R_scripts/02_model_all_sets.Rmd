@@ -1,0 +1,178 @@
+---
+title: "National SET Outputs 2"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output: 
+        html_document:
+                toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(here)
+library(nlme)
+```
+
+Read in combined data file.  
+
+```{r}
+in_path <- here::here("data", "processed_combined", "all_sites.csv")
+dat_all2 <- read.csv(in_path, stringsAsFactors = FALSE) 
+```
+
+Group by reserve and set_id and run the model.  (Just kidding; this led to all kinds of errors.)
+
+```{r, eval = FALSE}
+models2 <- dat_all2 %>%
+    group_by(reserve, set_id) %>%
+    do(mod = lme(pin_height ~ date, data = ., random = ~1|arm_position/pin_number, na.action = na.omit))
+
+models3 <- dat_all2 %>%
+    group_by(reserve, set_id) %>%
+    do(mod = lme(pin_height ~ date2, data = ., random = ~1|arm_position/pin_number, na.action = na.omit))
+
+# ignore arm position; only use pin as random effect
+models4 <- dat_all2 %>%
+    group_by(reserve, set_id) %>%
+    do(mod = lme(pin_height ~ date2, data = ., random = ~1|arm_pin, na.action = na.omit))
+
+```
+
+
+Maybe those didn't include enough data. Let's filter it first:
+
+```{r}
+to_keep <- dat_all2 %>% 
+       group_by(reserve, set_id, arm_position, pin_number) %>% 
+        summarize(count = n(),
+                  daterange = max(date2) - min(date2)) %>% 
+        arrange(count)
+
+knitr::kable(head(to_keep))
+
+sum(to_keep$count >= 3) / 36   # 154
+sum(to_keep$count >= 5) / 36   # 158
+```
+
+Let's see. We want at least 5 measurements over at least.... 3 years? What do we end up with if we only keep SETs with at least 5 measurements?
+
+```{r}
+to_keep2 <- dat_all2 %>% 
+        group_by(reserve, set_id, arm_position, pin_number) %>% 
+        summarize(count = n(),
+                  daterange = max(date2) - min(date2)) %>%
+        filter(count >= 5) %>% 
+        arrange(daterange)
+
+table(unique(round(to_keep2$daterange, 1)))
+
+sum(to_keep2$daterange >= 3) / 36    # 147
+sum(to_keep2$daterange >= 4) / 36    # 147
+sum(to_keep2$daterange >= 4.5) / 36  # 132
+sum(to_keep2$daterange >= 5) / 36    # 112
+
+
+```
+
+
+# Brook, you probably want to start here  
+
+Okay, so keep all SETs with at least 5 readings over at least 4.5 years.  
+
+```{r}
+to_keep_no_really <- to_keep2 %>% 
+        filter(daterange >= 4.5)
+
+to_analyze <- dat_all2 %>% 
+        filter(set_id %in% unique(to_keep_no_really$set_id))
+
+models5 <- to_analyze %>%
+    group_by(reserve, set_id) %>%
+    do(mod = lme(pin_height ~ date, data = ., random = ~1|arm_position/pin_number, na.action = na.omit))
+```
+
+
+Get some diagnostics from the models, along with number of measurements and number of years of data. Arranged with sites that throw errors at the top.  
+
+```{r}
+var_comps <- data.frame(reserve = character(),
+                        set_id = character(),
+                        arm_int = numeric(),
+                        pin_int = numeric(),
+                        resid = numeric(),
+                        works = character(),
+                        n_readings = numeric(),
+                        n_years = numeric(),
+                        stringsAsFactors = FALSE)
+
+for(i in 1:nrow(models5)){
+        vari <- VarCorr(models5$mod[[i]])
+        var_comps[i, "reserve"] <- models5[i, "reserve"]
+        var_comps[i, "set_id"] <- models5[i, "set_id"]
+        var_comps[i, "arm_int"] <- vari[2, 1]
+        var_comps[i, "pin_int"] <- vari[4, 1]
+        var_comps[i, "resid"] <- vari[5, 1]
+        var_comps[i, "works"] <- ifelse(class(models5$mod[[i]]$apVar) == "character",
+                                        "ERROR",
+                                        "ok")
+        metadat <- to_keep2[to_keep2$reserve == models5$reserve[i] & to_keep2$set_id == models5$set_id[i], ]
+        var_comps[i, "n_readings"] <- max(metadat$count)
+        var_comps[i, "n_years"] <- round(max(metadat$daterange), 1)
+}
+```
+
+```{r}
+sum(var_comps$works == "ERROR")
+nrow(var_comps)
+```
+
+Okay, so only 20 out of 130 sites throw errors. That's not bad. (The second time I did this, it said 17.) (But also, didn't we start with 132? Where are the other 2?)
+
+To show what I'm pulling out of the various bits and pieces of the variance component, here's the SET that shows up at the top. I've pulled the "Variance" column and referred to the arm_position (Intercept) row as `arm_int`; the pin_number (Intercept) value as `pin_int`, and the Residual as `resid`.  
+
+```{r}
+pick_me <- which(models5$set_id == "MIE3")
+VarCorr(models5$mod[[pick_me]])
+```
+
+
+Here are all those variance components in data frame form, with error-throwing SETs (non-positive definite covariance matrix) at the top:  
+
+```{r}
+var_comps %>%
+        mutate_at(c("arm_int", "pin_int", "resid"), as.numeric) %>% 
+        mutate(var_lowest = case_when(abs(arm_int) > abs(pin_int) ~ pin_int,
+                                      TRUE ~ arm_int)) %>% 
+        arrange(works, var_lowest) %>% 
+        knitr::kable(digits = 3)
+```
+
+
+```{r, fig.width = 8, fig.height = 11}
+library(ggplot2)
+
+ind_reserves <- unique(dat_all2$reserve)
+
+for(i in seq_along(ind_reserves)){
+        to_plot <- filter(dat_all2, reserve == ind_reserves[i])
+        p <- ggplot(to_plot) +
+                geom_point(aes(x = date, y = pin_height)) +
+                geom_smooth(aes(x = date, y = pin_height), method = "lm", se = FALSE) +
+                facet_wrap(~ set_id, ncol = 4, scales = "free") +
+                ggtitle(ind_reserves[i]) +
+                theme_bw()
+        print(p)
+}
+
+```
+
