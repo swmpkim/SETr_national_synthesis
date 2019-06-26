@@ -1,0 +1,296 @@
+---
+title: "Generating rates of change and CIs for all SETs"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(here)
+library(janitor)
+library(nlme)
+library(ggplot2)
+```
+
+Read in combined data file.  
+
+```{r}
+in_path <- here::here("data", "processed_combined", "all_sites.csv")
+dat <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
+    mutate(date = lubridate::ymd(paste(year, month, day, sep = "-")),
+           date2 = lubridate::decimal_date(date))
+```
+
+
+
+***
+
+Read in metadata.  
+
+```{r}
+in_path <- here::here("metadata", "combined", "all_sites_metadata.csv")
+mdat <- read.csv(in_path, stringsAsFactors = FALSE)
+```
+
+Make sure all SETs we have in the `dat` data frame are present in the metadata, and that they have lat/long coordinates. Get rid of anything in the metadata that's not in the data (some reserves have information on SETs that aren't up and running yet).  
+
+```{r}
+# first pull out set_id from both data frames
+data_setid <- unique(as.character(dat$set_id))
+metadata_setid <- unique(mdat$set_id)
+# find set_ids that are in the data, but not in the metadata
+dat_not_m <- setdiff(data_setid, metadata_setid)
+# find set_ids that are in the metadata, but not in the data
+m_not_dat <- setdiff(metadata_setid, data_setid)
+
+# print a message
+if (length(dat_not_m) > 0) {
+    toprint <- paste(dat_not_m, collapse = ", ")
+    warning(paste0("The following SET IDs exist in your data, but not in your metadata: ", toprint))
+}
+```
+
+As of 6/26:  
+
++  APA Little St. Marks was only measured once, in 2016. Will leave it in data file but remove it from data frame for this analysis.  
++  CBM hasn't sent metadata, so those data will be run through the rate calculations but not put on a map.   
+
+
+```{r}
+if (length(m_not_dat) > 0) {
+    toprint <- paste(m_not_dat, collapse = ", ")
+    warning(paste0("The following SET IDs exist in your metadata, but not in your data, and will be removed within the current analysis: ", toprint))
+}
+if (length(dat_not_m) + length(m_not_dat) == 0) {
+    print("SET IDs match in your data and metadata files.")
+}
+```
+
+
+Weed out the APA station from the data; remove stations in metadata that aren't in data.  
+
+```{r}
+to_remove_dat <- c("Little St. Marks")
+dat <- filter(dat, !(set_id %in% to_remove_dat))
+mdat <- filter(mdat, !(set_id %in% m_not_dat))
+```
+
+Check for any stations in the metadata that don't have lat/long coordinates.  
+
+```{r}
+sum(is.na(mdat$lat))
+mdat %>% 
+  filter(is.na(lat)) %>% 
+  select(reserve, set_id)
+```
+
+### Come back to this later if there are problems. Might need to just remove those from the data frame and treat them like the stations for which we have no metadata.  
+
+***
+
+# Filter by time and number of samples  
+
+Filter to only analyze sites with at least 5 measurements over at least 4.5 years.  
+
+```{r}
+to_keep <- dat %>% 
+       group_by(reserve, set_id, arm_position, pin_number) %>% 
+        summarize(count = n(),
+                  daterange = max(date2) - min(date2)) %>% 
+        filter(count >= 5,
+               daterange >= 4.5)
+
+
+to_analyze <- dat %>% 
+        filter(set_id %in% unique(to_keep$set_id))
+```
+
+Working with how many SETs?  
+
+```{r}
+length(unique(to_analyze$set_id))
+```
+
+At how many reserves?  
+
+```{r}
+length(unique(to_analyze$reserve))
+```
+
+# Generate rates  
+
+Run fully specified models; as seen in `99_model_testing_all_sets`, rates and CIs come out almost identical whether you specify pins nested within arms as random effects, or only specify pins as random effects. So here, we'll use the nesting.    
+
+```{r}
+models_fully_nested <- to_analyze %>%
+    group_by(reserve, set_id) %>%
+    do(mod = lme(pin_height ~ date, data = ., random = ~1|arm_position/arm_pin, na.action = na.omit))
+```
+
+Pull out information from the models.  
+
+```{r}
+lmm_out_full <- models_fully_nested %>% 
+  mutate(rate_full = intervals(mod, which = "fixed")$fixed["date", 2] * 365.25,
+         CI_low_full = intervals(mod, which = "fixed")$fixed["date", 1] * 365.25,
+         CI_high_full = intervals(mod, which = "fixed")$fixed["date", 3] * 365.25) %>% 
+  select(-mod)
+```
+
+```{r}
+lmm_out_full %>%  
+  knitr::kable(digits = 4)
+```
+
+***
+***
+
+# Join rates to metadata  
+
+Need to do a full join; there are some sites in the data that aren't in metadata; and some sites in metadata that didn't have enough data to be analyzed but we can put them on a map with some icon.  
+
+```{r}
+all_out <- full_join(mdat, lmm_out_full, by = c("reserve", "set_id"))
+```
+
+Get rid of any sites that are missing *both* a rate and a location.  
+
+```{r}
+# find 'em
+ditch <- all_out %>% 
+  filter(is.na(lat),
+         is.na(rate_full)) %>% 
+  select(reserve, set_id)
+
+# ditch 'em
+all_out <- all_out %>% 
+  filter(!(set_id %in% ditch$set_id))
+```
+
+
+Read in SLR rates and join them to the data frame so we can make comparisons.  
+
+```{r}
+slr_path <- here::here("metadata", "Sea Level Rise Rates_2019-06-26.xlsx")
+slr_rates <- read_excel(slr_path) %>% 
+  clean_names() %>% 
+  remove_empty(which = c("rows", "cols"))
+
+to_join <- slr_rates %>% 
+  mutate(slr_CI_low = slr_rate_mm_yr - x95_percent_ci,
+         slr_CI_high = slr_rate_mm_yr + x95_percent_ci) %>% 
+  select(reserve, 
+         slr_rate = slr_rate_mm_yr,
+         slr_CI_low,
+         slr_CI_high,
+         slr_start = data_start,
+         slr_end = data_end)
+
+all_to_compare <- left_join(all_out, to_join, by = "reserve") 
+```
+
+Weed out some columns; generate comparison columns for both 0 and slr.  
+
+```{r}
+rates_comp <- all_to_compare %>% 
+  select(reserve, set_id, user_friendly_set_name, numerical_order,
+         lat, long, rate = rate_full, CI_low = CI_low_full, CI_high = CI_high_full,
+         slr_rate, slr_CI_low, slr_CI_high) %>% 
+  mutate(dir_0 = case_when(CI_high < 0 ~ "dec_sig",
+                             CI_low > 0  ~ "inc_sig",
+                             rate < 0 ~ "dec_nonsig",
+                             rate > 0 ~ "inc_nonsig",
+                             TRUE ~ "not_enough_info"),
+           dir_slr = case_when(CI_high < slr_CI_low ~ "dec_sig",
+                               CI_low > slr_CI_high  ~ "inc_sig",
+                               rate < slr_rate ~ "dec_nonsig",
+                               rate > slr_rate ~ "inc_nonsig",
+                               TRUE ~ "not_enough_info"),
+         set_to_slr = rate / slr_rate) 
+```
+
+
+Summarize the categories.  
+
+```{r}
+rates_comp_summary <- rates_comp %>% 
+  select(reserve, set_id, dir_0, dir_slr) %>% 
+  gather(key = comparison, value = value, -reserve, -set_id) %>%
+  group_by(reserve, comparison, value) %>% 
+  summarize(total = n())  
+  
+```
+
+
+```{r}
+test <- rates_comp_summary %>% 
+  filter(reserve == "MAR")
+
+my_palette <- c("red3", "red", "navyblue", "blue", "gray80")
+
+ggplot(test) +
+  geom_col(aes(x = reserve, y = total, fill = value)) +
+  facet_grid(reserve ~ comparison) +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(values = my_palette) +
+  theme_minimal()
+```
+
+
+Write out the files to use in mapping script.  
+
+```{r}
+out_path <- here::here("data", "intermediate", "rate_summary.csv")
+write.csv(all_out, out_path, row.names = FALSE)
+
+out_path <- here::here("data", "intermediate", "rate_comparisons.csv")
+write.csv(rates_comp, out_path, row.names = FALSE)
+```
+
+
+
+
+
+# Graphs  
+
+### To make sure linear models make sense in the first place  
+
+Spoiler alert: some don't.  
+
+```{r, fig.width = 8, fig.height = 11, message = FALSE, warning = FALSE}
+
+ind_reserves <- unique(dat$reserve)
+
+for(i in seq_along(ind_reserves)){
+        to_plot <- filter(dat, reserve == ind_reserves[i])
+        p <- ggplot(to_plot) +
+                geom_point(aes(x = date, y = pin_height, col = as.factor(arm_position)),
+                           alpha = 0.5) +
+                geom_smooth(aes(x = date, y = pin_height), method = "lm", se = FALSE) +
+                facet_wrap(~ set_id, ncol = 4, scales = "free") +
+                labs(title = ind_reserves[i],
+                     color = "Arm Position") +
+                theme_bw()
+        print(p)
+}
+
+```
+
+
