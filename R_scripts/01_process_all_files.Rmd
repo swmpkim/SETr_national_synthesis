@@ -2,8 +2,14 @@
 title: "National SET Outputs"
 author: "Kim Cressman"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+        html_document:
+                toc: yes
 ---
+
+6/26/19 - Have updated site names in a few data/metadata files, so am rerunning this.
+-- Have also inserted code to wrangle and combine metadata files.  
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -19,8 +25,11 @@ library(stringr)
 library(lubridate)
 library(here)
 library(nlme)
+library(janitor)
 ```
 
+
+# Tidy the individual raw data files  
 
 Find and list the raw files.  
 
@@ -47,6 +56,8 @@ for(i in seq_along(raw_files)){
 message("\n \nFinished with file processing \n")
 ```
 
+
+# Combine the individual tidy files into one  
 
 
 Now read them all in and combine them into one big file.  
@@ -118,5 +129,47 @@ Write out to a csv for later use.
 ```{r}
 out_path <- here::here("data", "processed_combined", "all_sites.csv")
 write.csv(dat_all2, out_path, row.names = FALSE)
+```
+
+
+# Read in and combine metadata files  
+
+Find and list the raw files.  
+
+```{r}
+raw_path <- here::here("metadata", "reserve_level")
+raw_files <- dir(raw_path, pattern = "set_metadata.xls")
+```
+
+Read them in and combine them.  
+
+```{r}
+combined_list <- list()
+
+for(i in seq_along(raw_files)){
+        in_path <- here::here("metadata", "reserve_level", raw_files[i])
+        dat <- read_excel(in_path) %>% 
+                clean_names() %>% 
+                select(reserve,
+                       set_id = unique_set_id,
+                       user_friendly_set_name,
+                       numerical_order,
+                       set_type,
+                       lat = latitude_dec_deg,
+                       long = longitude_dec_deg,
+                       starts_with("co_dominant_species"),
+                       general_salinity) %>% 
+                mutate_at(c("reserve", "set_id", "user_friendly_set_name", "general_salinity"), as.character) 
+        combined_list[[i]] <- dat
+}
+
+metadat_all <- bind_rows(combined_list)
+```
+
+Write that out.  
+
+```{r}
+out_path <- here::here("metadata", "combined", "all_sites_metadata.csv")
+write.csv(metadat_all, out_path, row.names = FALSE)
 ```
 
