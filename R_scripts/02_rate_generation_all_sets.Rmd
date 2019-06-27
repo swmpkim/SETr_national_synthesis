@@ -333,6 +333,9 @@ write.csv(all_out, out_path, row.names = FALSE)
 
 out_path <- here::here("data", "intermediate", "rate_comparisons.csv")
 write.csv(rates_comp, out_path, row.names = FALSE)
+
+out_path <- here::here("data", "intermediate", "rate_comparisons_summary.csv")
+write.csv(rates_comp_summary, out_path, row.names = FALSE)
 ```
 
 
