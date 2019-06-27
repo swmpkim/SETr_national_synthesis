@@ -305,7 +305,7 @@ for(i in seq_along(reserves)){
     # save the plot
     file_out <- paste0(res_to_plot, "_", comp_to_plot, ".png")
     out_path <- here::here("R_output", "figures", "pie_charts", file_out)
-    ggsave(out_path)
+    ggsave(out_path, bg = "transparent")
   }
 }
 
