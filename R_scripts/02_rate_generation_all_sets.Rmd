@@ -245,8 +245,12 @@ rates_comp_summary <- rates_comp %>%
 
 ```{r}
 # set up color palette; associate it with the correct factor levels
-# from colorbrewer2.org, 5-class RdYlBu, substituting a gray for the yellow middle value
-to_color <- c("#d7191c", "#fdae61", "#f0f0f0", "#abd9e9", "#2c7bb6")
+# from colorbrewer2.org, 5-class RdYlBu, substituting a gray for the yellow middle value:
+# to_color <- c("#d7191c", "#fdae61", "#f0f0f0", "#abd9e9", "#2c7bb6")
+
+
+# dark colors consistent with map icons; mid red/blue from color brewer 5-class RdBu:
+to_color <- c("#c00000", "#f4a582", "#f0f0f0", "#92c5de", "#2f5597")  
 names(to_color) <- levels(rates_comp_summary$value)
 
 # generate some info to calculate y positions
@@ -258,28 +262,53 @@ to_plot <- rates_comp_summary %>%
   mutate(total_cumu = cumsum(total),
          ypos = sum(total) - (total_cumu - total/2))
 
-# filter data
-test <- to_plot %>% 
-  filter(reserve == "GND",
-         comparison == "dir_slr")
 
-# make a plot
-res_to_plot <- unique(test$reserve) 
-nsets <- sum(test$total)
-ggplot(test) +
-  geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
-  scale_fill_manual(values = to_color) +
-  geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"), 
-            color = "black",
-            #fill = "gray99",
-            size = 5) +
-  coord_polar("y", start = 0) +
-  labs(title = res_to_plot, 
-       subtitle = paste0("(n = ", nsets, ")")) +
-  theme_void()  + 
-  theme(plot.title = element_text(hjust = 0.5, vjust = -3),
-        plot.subtitle = element_text(hjust = 0.5, vjust = -3),
-        legend.position = "none")
+
+# going to need to do a nested loop
+# for each reserve...
+#  .... for each comparison type
+
+reserves <- unique(to_plot$reserve)
+comp_type <- unique(to_plot$comparison)
+
+
+for(i in seq_along(reserves)){
+  # pull out the reserve
+  dat_sub <- to_plot %>% 
+    filter(reserve == reserves[i])
+  
+  # loop through comparison type
+  for(j in seq_along(comp_type)){
+    to_plo <- dat_sub %>% 
+      filter(comparison == comp_type[j])
+    
+    # set up names
+    res_to_plot <- reserves[i]
+    comp_to_plot <- comp_type[j]
+    nsets <- sum(to_plo$total)
+    
+    # make the plot
+    p <- ggplot(to_plo) +
+      geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
+      scale_fill_manual(values = to_color) +
+      geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"), 
+                color = "gray10",
+                size = 5) +
+      coord_polar("y", start = 0) +
+      labs(title = res_to_plot, 
+           subtitle = paste0("(n = ", nsets, ")")) +
+      theme_void()  + 
+      theme(plot.title = element_text(hjust = 0.5, vjust = -3),
+            plot.subtitle = element_text(hjust = 0.5, vjust = -3),
+            legend.position = "none")
+    
+    # save the plot
+    file_out <- paste0(res_to_plot, "_", comp_to_plot, ".png")
+    out_path <- here::here("R_output", "figures", "pie_charts", file_out)
+    ggsave(out_path)
+  }
+}
+
 ```
 
 
