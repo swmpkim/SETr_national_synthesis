@@ -279,16 +279,16 @@ for(i in seq_along(reserves)){
   
   # loop through comparison type
   for(j in seq_along(comp_type)){
-    to_plo <- dat_sub %>% 
+    to_plot_sub <- dat_sub %>% 
       filter(comparison == comp_type[j])
     
     # set up names
     res_to_plot <- reserves[i]
     comp_to_plot <- comp_type[j]
-    nsets <- sum(to_plo$total)
+    nsets <- sum(to_plot_sub$total)
     
     # make the plot
-    p <- ggplot(to_plo) +
+    p <- ggplot(to_plot_sub) +
       geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
       scale_fill_manual(values = to_color) +
       geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"), 
@@ -311,10 +311,23 @@ for(i in seq_along(reserves)){
 
 ```
 
+Those pie charts can be used to represent each reserve. Need to generate a data frame with a single point per reserve. I'll just average all the lats and longs for each one.  
+
+```{r}
+locations <- rates_comp %>% 
+  group_by(reserve) %>% 
+  summarize(lat = mean(lat, na.rm = TRUE),
+            long = mean(long, na.rm = TRUE)) %>% 
+  filter(!is.na(lat),
+         !is.na(long))
+```
 
 Write out the files to use in mapping script.  
 
 ```{r}
+out_path <- here::here("data", "intermediate", "locations.csv")
+write.csv(locations, out_path, row.names = FALSE)
+
 out_path <- here::here("data", "intermediate", "rate_summary.csv")
 write.csv(all_out, out_path, row.names = FALSE)
 
