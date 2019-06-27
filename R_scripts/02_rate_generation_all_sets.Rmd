@@ -27,6 +27,7 @@ library(here)
 library(janitor)
 library(nlme)
 library(ggplot2)
+library(forcats)
 ```
 
 Read in combined data file.  
@@ -213,15 +214,15 @@ rates_comp <- all_to_compare %>%
   select(reserve, set_id, user_friendly_set_name, numerical_order,
          lat, long, rate = rate_full, CI_low = CI_low_full, CI_high = CI_high_full,
          slr_rate, slr_CI_low, slr_CI_high) %>% 
-  mutate(dir_0 = case_when(CI_high < 0 ~ "dec_sig",
-                             CI_low > 0  ~ "inc_sig",
-                             rate < 0 ~ "dec_nonsig",
-                             rate > 0 ~ "inc_nonsig",
+  mutate(dir_0 = case_when(CI_high < 0 ~ "lower_sig",
+                             CI_low > 0  ~ "higher_sig",
+                             rate < 0 ~ "lower_nonsig",
+                             rate > 0 ~ "higher_nonsig",
                              TRUE ~ "not_enough_info"),
-           dir_slr = case_when(CI_high < slr_CI_low ~ "dec_sig",
-                               CI_low > slr_CI_high  ~ "inc_sig",
-                               rate < slr_rate ~ "dec_nonsig",
-                               rate > slr_rate ~ "inc_nonsig",
+           dir_slr = case_when(CI_high < slr_CI_low ~ "lower_sig",
+                               CI_low > slr_CI_high  ~ "higher_sig",
+                               rate < slr_rate ~ "lower_nonsig",
+                               rate > slr_rate ~ "higher_nonsig",
                                TRUE ~ "not_enough_info"),
          set_to_slr = rate / slr_rate) 
 ```
@@ -234,23 +235,51 @@ rates_comp_summary <- rates_comp %>%
   select(reserve, set_id, dir_0, dir_slr) %>% 
   gather(key = comparison, value = value, -reserve, -set_id) %>%
   group_by(reserve, comparison, value) %>% 
-  summarize(total = n())  
-  
+  summarize(total = n()) %>% 
+  mutate(value = factor(value, levels = c( 
+                             "lower_sig", "lower_nonsig", 
+                             "not_enough_info", 
+                             "higher_nonsig", "higher_sig"))) 
 ```
 
 
 ```{r}
-test <- rates_comp_summary %>% 
-  filter(reserve == "MAR")
+# set up color palette; associate it with the correct factor levels
+# from colorbrewer2.org, 5-class RdYlBu, substituting a gray for the yellow middle value
+to_color <- c("#d7191c", "#fdae61", "#f0f0f0", "#abd9e9", "#2c7bb6")
+names(to_color) <- levels(rates_comp_summary$value)
 
-my_palette <- c("red3", "red", "navyblue", "blue", "gray80")
+# generate some info to calculate y positions
+to_plot <- rates_comp_summary %>% 
+  ungroup() %>% 
+  arrange(reserve, comparison, value) %>% 
+  group_by(reserve, comparison) %>%
+  arrange(reserve, comparison, value) %>% 
+  mutate(total_cumu = cumsum(total),
+         ypos = sum(total) - (total_cumu - total/2))
 
+# filter data
+test <- to_plot %>% 
+  filter(reserve == "GND",
+         comparison == "dir_slr")
+
+# make a plot
+res_to_plot <- unique(test$reserve) 
+nsets <- sum(test$total)
 ggplot(test) +
-  geom_col(aes(x = reserve, y = total, fill = value)) +
-  facet_grid(reserve ~ comparison) +
+  geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
+  scale_fill_manual(values = to_color) +
+  geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"), 
+            color = "black",
+            #fill = "gray99",
+            size = 5) +
   coord_polar("y", start = 0) +
-  scale_fill_manual(values = my_palette) +
-  theme_minimal()
+  labs(title = res_to_plot, 
+       subtitle = paste0("(n = ", nsets, ")")) +
+  theme_void()  + 
+  theme(plot.title = element_text(hjust = 0.5, vjust = -3),
+        plot.subtitle = element_text(hjust = 0.5, vjust = -3),
+        legend.position = "none")
 ```
 
 
