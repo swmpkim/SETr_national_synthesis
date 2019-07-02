@@ -291,16 +291,16 @@ for(i in seq_along(reserves)){
     p <- ggplot(to_plot_sub) +
       geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
       scale_fill_manual(values = to_color) +
-      geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"), 
+      geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"),
                 color = "gray10",
                 size = 5) +
       coord_polar("y", start = 0) +
-      labs(title = res_to_plot, 
-           subtitle = paste0("(n = ", nsets, ")")) +
-      theme_void()  + 
-      theme(plot.title = element_text(hjust = 0.5, vjust = -3),
-            plot.subtitle = element_text(hjust = 0.5, vjust = -3),
-            legend.position = "none")
+      # labs(title = res_to_plot, 
+      #     subtitle = paste0("(n = ", nsets, ")")) +   # labels don't work when the icons are so small
+      theme_void() +   
+      theme( #plot.title = element_text(hjust = 0.5, vjust = -3),
+      #       plot.subtitle = element_text(hjust = 0.5, vjust = -3),
+             legend.position = "none")
     
     # save the plot
     file_out <- paste0(res_to_plot, "_", comp_to_plot, ".png")
