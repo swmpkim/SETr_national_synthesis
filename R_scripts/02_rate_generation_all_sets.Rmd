@@ -250,8 +250,13 @@ rates_comp_summary <- rates_comp %>%
 
 
 # dark colors consistent with map icons; mid red/blue from color brewer 5-class RdBu:
-to_color <- c("#c00000", "#f4a582", "#f0f0f0", "#92c5de", "#2f5597")  
+to_color_lightgray <- c("#c00000", "#f4a582", "#f0f0f0", "#92c5de", "#2f5597")  
+to_color <- c("#c00000", "#f4a582", "#fffacd", "#92c5de", "#2f5597") # using yellow for contrast on map 
 names(to_color) <- levels(rates_comp_summary$value)
+to_label <- c("Lower, CIs don't overlap", "Lower, CIs overlap", 
+                     "Not enough information",
+                     "Higher, CIs overlap", "Higher, CIs don't overlap")
+
 
 # generate some info to calculate y positions
 to_plot <- rates_comp_summary %>% 
@@ -287,25 +292,39 @@ for(i in seq_along(reserves)){
     comp_to_plot <- comp_type[j]
     nsets <- sum(to_plot_sub$total)
     
-    # make the plot
+    # to use on maps:
     p <- ggplot(to_plot_sub) +
-      geom_col(aes(x = "", y = total, fill = value), color = "gray60") +
-      scale_fill_manual(values = to_color) +
+      geom_col(aes(x = "", y = total, fill = value), color = "black", size = 1) +
+      scale_fill_manual(values = to_color,
+                        labels = to_label,
+                        drop = FALSE) +
+      coord_polar("y", start = 0) +
+      theme_void() +   
+      theme(legend.position = "none")
+    
+    # to use individually:
+    q <- p +
       geom_text(aes(x = "", y = ypos, label = total, fontface = "bold"),
                 color = "gray10",
                 size = 5) +
-      coord_polar("y", start = 0) +
-      # labs(title = res_to_plot, 
-      #     subtitle = paste0("(n = ", nsets, ")")) +   # labels don't work when the icons are so small
-      theme_void() +   
-      theme( #plot.title = element_text(hjust = 0.5, vjust = -3),
-      #       plot.subtitle = element_text(hjust = 0.5, vjust = -3),
-             legend.position = "none")
+      labs(title = res_to_plot,
+          subtitle = paste0("(n = ", nsets, ")")) +
+      theme(plot.title = element_text(hjust = 0.5, vjust = -3),
+             plot.subtitle = element_text(hjust = 0.5, vjust = -3),
+            legend.position = "right")  
     
-    # save the plot
-    file_out <- paste0(res_to_plot, "_", comp_to_plot, ".png")
-    out_path <- here::here("R_output", "figures", "pie_charts", file_out)
-    ggsave(out_path, bg = "transparent")
+    
+    
+    # save the plots
+    file_out <- paste0(res_to_plot, "_", comp_to_plot, ".svg")
+    out_path <- here::here("R_output", "figures", "for_maps", file_out)
+    ggsave(out_path, plot = p, bg = "transparent",
+           width = 1, height = 1, units = "in")
+    
+    file_out <- paste0(res_to_plot, "_", comp_to_plot, "_full.svg")
+    out_path <- here::here("R_output", "figures", "for_individual_use", file_out)
+    ggsave(out_path, plot = q, bg = "transparent",
+           width = 7, height = 7, units = "in")
   }
 }
 
