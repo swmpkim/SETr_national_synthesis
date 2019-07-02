@@ -15,6 +15,17 @@ in_path <- here::here("R_output", "figures", "for_maps")
 file_paths_0 <- dir(in_path, pattern = "dir_0.svg", full.names = TRUE)
 file_paths_slr <- dir(in_path, pattern = "dir_slr.svg", full.names = TRUE)
 
+# name those vectors in case I want to subset to regions
+names(file_paths_slr) <- substr(file_paths_slr, 
+                                nchar(file_paths_slr) - 14, 
+                                nchar(file_paths_slr) - 12)
+names(file_paths_0) <- substr(file_paths_0, 
+                                nchar(file_paths_0) - 12, 
+                                nchar(file_paths_0) - 10)
+
+# refer to subsetted icons like this, or something
+file_paths_0[names(file_paths_0) %in% "APA"]  # where "APA" would be the subset of reserves we care about
+
 
 # set up the color palette and labels for the legend
 to_color <- c("#c00000", "#f4a582", "#fffacd", "#92c5de", "#2f5597") 
