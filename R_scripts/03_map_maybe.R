@@ -12,6 +12,7 @@ in_path <- here::here("R_output", "figures", "pie_charts")
 
 # file names will look like this
 files_0 <- dir(in_path, pattern = "dir_0.png")
+
 files_slr <- dir(in_path, pattern = "dir_slr.png")
 
 # loop through reserves to read in icons
@@ -20,6 +21,8 @@ reserves <- unique(loc_dat$reserve)
 # set up the lists for the icons to go into
 icons_0 <- list()
 icons_slr <- list()
+
+file_paths_0 <- paste0(in_path, "/", reserves, "_dir_0.png")
 
 for(i in seq_along(reserves)){
         res_in <- reserves[i]
@@ -72,9 +75,15 @@ names(to_color) <- c("Lower, CIs don't overlap", "Lower, CIs overlap",
 ##############################
 
 
-m <- leaflet(loc_dat2) %>% 
+m <- leaflet(loc_dat) %>% 
         addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
-        addMarkers(data = loc_dat2,
+        addMarkers(data = loc_dat,
                    lng = ~long,
                    lat = ~lat,
-                   icon = ~icon)
+                   icon = ~icons(
+                         iconUrl = file_paths_0,
+                         iconHeight = 30,
+                         iconWidth = 30
+                   ))
+m
+
