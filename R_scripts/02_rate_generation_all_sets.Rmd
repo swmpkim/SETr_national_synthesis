@@ -68,10 +68,10 @@ if (length(dat_not_m) > 0) {
 }
 ```
 
-As of 6/26:  
+As of 7/2:  
 
 +  APA Little St. Marks was only measured once, in 2016. Will leave it in data file but remove it from data frame for this analysis.  
-+  CBM hasn't sent metadata, so those data will be run through the rate calculations but not put on a map.   
+ 
 
 
 ```{r}
