@@ -374,9 +374,13 @@ ind_reserves <- unique(dat$reserve)
 for(i in seq_along(ind_reserves)){
         to_plot <- filter(dat, reserve == ind_reserves[i])
         p <- ggplot(to_plot) +
-                geom_point(aes(x = date, y = pin_height, col = as.factor(arm_position)),
+                geom_point(aes(x = date, 
+                               y = pin_height, 
+                               col = as.factor(arm_position)),
                            alpha = 0.5) +
-                geom_smooth(aes(x = date, y = pin_height), method = "lm", se = FALSE) +
+                geom_smooth(aes(x = date, y = pin_height), 
+                            method = "lm", 
+                            se = FALSE) +
                 facet_wrap(~ set_id, ncol = 4, scales = "free") +
                 labs(title = ind_reserves[i],
                      color = "Arm Position") +

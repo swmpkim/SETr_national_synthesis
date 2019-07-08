@@ -1,0 +1,145 @@
+---
+title: "Plot Generation - all reserves, all SETs"
+author: "Kim Cressman"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+I'm going to loop through all reserves and spit out consistent plots for all of them. Using Rmd so they all show up in one document, but I'll also be saving them out.  
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(janitor)
+library(readxl)
+library(lubridate)
+library(here)
+library(ggplot2)
+library(forcats)
+```
+
+
+Read in metadata, sea level files, and file with rates and CIs for each SET.  
+
+```{r}
+in_path <- here::here("data", "intermediate", "rate_summary.csv")
+dat_rates <- read.csv(in_path, stringsAsFactors = FALSE)
+
+in_path <- here::here("data", "intermediate", "rate_comparisons.csv")
+dat_slr_comps <- read.csv(in_path, stringsAsFactors = FALSE)
+
+slr_path <- here::here("metadata", "Sea Level Rise Rates_2019-06-26.xlsx")
+slr_rates <- read_excel(slr_path) %>% 
+  clean_names() %>% 
+  remove_empty(which = c("rows", "cols")) %>% 
+  mutate(slr_CI_low = slr_rate_mm_yr - x95_percent_ci,
+         slr_CI_high = slr_rate_mm_yr + x95_percent_ci)
+```
+
+
+
+```{r}
+reserves <- unique(dat_rates$reserve)
+```
+
+```{r}
+for(i in seq_along(reserves)){
+        # subset the data
+        to_plo <- dat_rates[dat_rates$reserve == reserves[i], ]
+        slr <- unlist(slr_rates[slr_rates$reserve == reserves[i], "slr_rate_mm_yr"])
+        slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x95_percent_ci"])
+        
+        # if there's a numerical order provided, make the graph using it
+        if(sum(is.na(to_plo$numerical_order)) + sum(is.na(to_plo$user_friendly_set_name)) == 0){
+                # make the set id a factor
+                a <- forcats::fct_reorder(to_plo$user_friendly_set_name,
+                                          desc(to_plo$numerical_order))
+                b <- forcats::fct_reorder(to_plo$set_id,
+                                          desc(to_plo$numerical_order))
+                
+                to_plo$user_friendly_set_name <- a
+                to_plo$set_id2 <- b
+                
+                p <- ggplot() +
+                        geom_blank(data = to_plo, 
+                                   aes(x = user_friendly_set_name, 
+                                       y = rate_full)) +
+                        geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
+                                        ymin = slr-slr_ci, 
+                                        ymax = slr+slr_ci), 
+                                    fill = "navyblue", 
+                                    alpha = 0.1) +
+                        geom_hline(aes(yintercept = slr), 
+                                   col = "navyblue", 
+                                   size = 1, 
+                                   alpha = 0.9) +
+                        geom_hline(aes(yintercept = 0), 
+                                   col = "gray70") +
+                        geom_errorbar(data = to_plo, 
+                                      aes(x = user_friendly_set_name, 
+                                          ymin = CI_low_full, 
+                                          ymax = CI_high_full), 
+                                      col = "gray55", 
+                                      size = 1) +
+                        geom_point(data = to_plo, 
+                                   aes(x = user_friendly_set_name, 
+                                       y = rate_full), 
+                                   size = 3, 
+                                   col = "red3") +
+                        theme_classic() + 
+                        labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
+                             subtitle = paste0("Local SLR in blue: ", 
+                                               slr, " +/- ", 
+                                               slr_ci, " mm/yr"), 
+                             x = "SET", 
+                             y = "Rate of change (mm/yr)") +
+                        coord_flip()
+        } else{
+        p <- ggplot() +
+                        geom_blank(data = to_plo, 
+                                   aes(x = set_id, 
+                                       y = rate_full)) +
+                        geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
+                                        ymin = slr-slr_ci, 
+                                        ymax = slr+slr_ci), 
+                                    fill = "navyblue", 
+                                    alpha = 0.1) +
+                        geom_hline(aes(yintercept = slr), 
+                                   col = "navyblue", 
+                                   size = 1, 
+                                   alpha = 0.9) +
+                        geom_hline(aes(yintercept = 0), 
+                                   col = "gray70") +
+                        geom_errorbar(data = to_plo, 
+                                      aes(x = set_id, 
+                                          ymin = CI_low_full, 
+                                          ymax = CI_high_full), 
+                                      col = "gray55", 
+                                      size = 1) +
+                        geom_point(data = to_plo, 
+                                   aes(x = set_id, 
+                                       y = rate_full), 
+                                   size = 3, 
+                                   col = "red3") +
+                        theme_classic() + 
+                        labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
+                             subtitle = paste0("Local SLR in blue: ", 
+                                               slr, " +/- ", 
+                                               slr_ci, " mm/yr"), 
+                             x = "SET", 
+                             y = "Rate of change (mm/yr)") +
+                        coord_flip()
+        }
+        print(p)
+        filename <- paste0(reserves[i], "_summary_plot.png")
+        out_path <- here::here("R_output", "figures", "summary_plots", filename)
+        ggsave(filename = out_path, plot = p)
+}
+
+```
+
