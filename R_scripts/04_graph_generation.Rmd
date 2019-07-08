@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 I'm going to loop through all reserves and spit out consistent plots for all of them. Using Rmd so they all show up in one document, but I'll also be saving them out.  
@@ -49,92 +49,75 @@ reserves <- unique(dat_rates$reserve)
 
 ```{r}
 for(i in seq_along(reserves)){
+        
         # subset the data
         to_plo <- dat_rates[dat_rates$reserve == reserves[i], ]
         slr <- unlist(slr_rates[slr_rates$reserve == reserves[i], "slr_rate_mm_yr"])
         slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x95_percent_ci"])
+
         
-        # if there's a numerical order provided, make the graph using it
+        # if there's a numerical order provided, AND user-friendly SET names, use both
         if(sum(is.na(to_plo$numerical_order)) + sum(is.na(to_plo$user_friendly_set_name)) == 0){
-                # make the set id a factor
+                
+                # put user-friendly set name in order according to user-provided numerical order
                 a <- forcats::fct_reorder(to_plo$user_friendly_set_name,
                                           desc(to_plo$numerical_order))
+                to_plo$graph_set_name <- a
+                
+                # if only a numerical order is provided, but no user-friendly set names:
+        } else if (sum(is.na(to_plo$numerical_order)) == 0) {
+                
+                # put (non-user-friendly) SET ID in order according to user-provided numerical order
                 b <- forcats::fct_reorder(to_plo$set_id,
                                           desc(to_plo$numerical_order))
+                to_plo$graph_set_name <- b
                 
-                to_plo$user_friendly_set_name <- a
-                to_plo$set_id2 <- b
                 
-                p <- ggplot() +
-                        geom_blank(data = to_plo, 
-                                   aes(x = user_friendly_set_name, 
-                                       y = rate_full)) +
-                        geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
-                                        ymin = slr-slr_ci, 
-                                        ymax = slr+slr_ci), 
-                                    fill = "navyblue", 
-                                    alpha = 0.1) +
-                        geom_hline(aes(yintercept = slr), 
-                                   col = "navyblue", 
-                                   size = 1, 
-                                   alpha = 0.9) +
-                        geom_hline(aes(yintercept = 0), 
-                                   col = "gray70") +
-                        geom_errorbar(data = to_plo, 
-                                      aes(x = user_friendly_set_name, 
-                                          ymin = CI_low_full, 
-                                          ymax = CI_high_full), 
-                                      col = "gray55", 
-                                      size = 1) +
-                        geom_point(data = to_plo, 
-                                   aes(x = user_friendly_set_name, 
-                                       y = rate_full), 
-                                   size = 3, 
-                                   col = "red3") +
-                        theme_classic() + 
-                        labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
-                             subtitle = paste0("Local SLR in blue: ", 
-                                               slr, " +/- ", 
-                                               slr_ci, " mm/yr"), 
-                             x = "SET", 
-                             y = "Rate of change (mm/yr)") +
-                        coord_flip()
-        } else{
-        p <- ggplot() +
-                        geom_blank(data = to_plo, 
-                                   aes(x = set_id, 
-                                       y = rate_full)) +
-                        geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
-                                        ymin = slr-slr_ci, 
-                                        ymax = slr+slr_ci), 
-                                    fill = "navyblue", 
-                                    alpha = 0.1) +
-                        geom_hline(aes(yintercept = slr), 
-                                   col = "navyblue", 
-                                   size = 1, 
-                                   alpha = 0.9) +
-                        geom_hline(aes(yintercept = 0), 
-                                   col = "gray70") +
-                        geom_errorbar(data = to_plo, 
-                                      aes(x = set_id, 
-                                          ymin = CI_low_full, 
-                                          ymax = CI_high_full), 
-                                      col = "gray55", 
-                                      size = 1) +
-                        geom_point(data = to_plo, 
-                                   aes(x = set_id, 
-                                       y = rate_full), 
-                                   size = 3, 
-                                   col = "red3") +
-                        theme_classic() + 
-                        labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
-                             subtitle = paste0("Local SLR in blue: ", 
-                                               slr, " +/- ", 
-                                               slr_ci, " mm/yr"), 
-                             x = "SET", 
-                             y = "Rate of change (mm/yr)") +
-                        coord_flip()
+                # if neither are given, just use set names but make them factors and reverse them so the first in the alphabet will be at the top
+        } else {
+                c <- factor(to_plo$set_id)
+                d <- forcats::fct_relevel(c, rev)
+                to_plo$graph_set_name <- d
         }
+        
+        
+        # make the plot
+        p <- ggplot() +
+                geom_blank(data = to_plo, 
+                           aes(x = graph_set_name, 
+                               y = rate_full)) +
+                geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
+                                ymin = slr-slr_ci, 
+                                ymax = slr+slr_ci), 
+                            fill = "navyblue", 
+                            alpha = 0.1) +
+                geom_hline(aes(yintercept = slr), 
+                           col = "navyblue", 
+                           size = 1, 
+                           alpha = 0.9) +
+                geom_hline(aes(yintercept = 0), 
+                           col = "gray70") +
+                geom_errorbar(data = to_plo, 
+                              aes(x = graph_set_name, 
+                                  ymin = CI_low_full, 
+                                  ymax = CI_high_full), 
+                              col = "gray55", 
+                              size = 1) +
+                geom_point(data = to_plo, 
+                           aes(x = graph_set_name, 
+                               y = rate_full), 
+                           size = 3, 
+                           col = "red3") +
+                theme_classic() + 
+                labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
+                     subtitle = paste0("Local SLR in blue: ", 
+                                       slr, " +/- ", 
+                                       slr_ci, " mm/yr"), 
+                     x = "SET", 
+                     y = "Rate of change (mm/yr)") +
+                coord_flip()
+       
+        # print and save the plot 
         print(p)
         filename <- paste0(reserves[i], "_summary_plot.png")
         out_path <- here::here("R_output", "figures", "summary_plots", filename)
