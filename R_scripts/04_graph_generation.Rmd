@@ -2,7 +2,10 @@
 title: "Plot Generation - all reserves, all SETs"
 author: "Kim Cressman"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -21,6 +24,9 @@ library(lubridate)
 library(here)
 library(ggplot2)
 library(forcats)
+library(leaflet)
+library(mapview)
+source(here::here("R_scripts", "sourced", "000_functions.R"))
 ```
 
 
@@ -32,6 +38,10 @@ dat_rates <- read.csv(in_path, stringsAsFactors = FALSE)
 
 in_path <- here::here("data", "intermediate", "rate_comparisons.csv")
 dat_slr_comps <- read.csv(in_path, stringsAsFactors = FALSE)
+
+in_path <- here::here("data", "processed_combined", "all_sites.csv")
+dat_all <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
+  mutate(date = lubridate::ymd(date))
 
 slr_path <- here::here("metadata", "Sea Level Rise Rates_2019-06-26.xlsx")
 slr_rates <- read_excel(slr_path) %>% 
@@ -47,33 +57,87 @@ slr_rates <- read_excel(slr_path) %>%
 reserves <- unique(dat_rates$reserve)
 ```
 
+
+```{r map_prep}
+# read in images to use as map icons
+icon_inc_sig_path <- here::here("img", "blue_up_arrow.png")
+icon_dec_sig_path <- here::here("img", "red_down_arrow.png")
+icon_inc_nonsig_path <- here::here("img", "gray_up_arrow.png")
+icon_dec_nonsig_path <- here::here("img", "gray_down_arrow.png")
+icon_nonsig_path <- here::here("img", "gray_dash.png")
+
+# make the icons
+icon_inc_siga <- icon_inc_sigb <- makeIcon(iconUrl = icon_inc_sig_path, 
+                                           iconWidth = 30, 
+                                           iconHeight = 35)
+icon_dec_siga <- icon_dec_sigb <- makeIcon(iconUrl = icon_dec_sig_path, 
+                                           iconWidth = 30, 
+                                           iconHeight = 35)
+icon_inc_nonsiga <- icon_inc_nonsigb <- makeIcon(iconUrl = icon_inc_nonsig_path, 
+                                                 iconWidth = 30, 
+                                                 iconHeight = 35)
+icon_dec_nonsiga <- icon_dec_nonsigb <- makeIcon(iconUrl = icon_dec_nonsig_path, 
+                                                 iconWidth = 30, 
+                                                 iconHeight = 35)
+icon_nonsiga <- icon_nonsigb <- makeIcon(iconUrl = icon_nonsig_path, 
+                                         iconWidth = 25, 
+                                         iconHeight = 12)
+
+
+# specify what these colors are, for the legends
+map_pal <- c("#c00000", "#2f5597", "#7f7f7f")
+```
+
+Loop through reserves and:  
+
++  create the "star wars" rate summary graph  
++  perform cumulative change calculations and make that graph  
++  make a map
+
 ```{r}
 for(i in seq_along(reserves)){
         
         # subset the data
         to_plo <- dat_rates[dat_rates$reserve == reserves[i], ]
-        slr <- unlist(slr_rates[slr_rates$reserve == reserves[i], "slr_rate_mm_yr"])
-        slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x95_percent_ci"])
+        to_calc <- dat_all[dat_all$reserve == reserves[i], ]
 
         
-        # if there's a numerical order provided, AND user-friendly SET names, use both
-        if(sum(is.na(to_plo$numerical_order)) + sum(is.na(to_plo$user_friendly_set_name)) == 0){
-                
-                # put user-friendly set name in order according to user-provided numerical order
+        # pull SLR rate and CI out of metadata
+        slr <- unlist(slr_rates[slr_rates$reserve == reserves[i], "slr_rate_mm_yr"])
+        slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x95_percent_ci"])
+        
+        
+        # generate some comparisons for the maps
+        to_map <- to_plo %>% 
+          mutate(dir_0 = case_when(CI_high_full < 0 ~ "dec_sig",
+                                   CI_low_full > 0  ~ "inc_sig",
+                                   rate_full < 0 ~ "dec_nonsig",
+                                   rate_full > 0 ~ "inc_nonsig",
+                                   TRUE ~ "nonsig"),
+                 dir_slr = case_when(CI_high_full < slr - slr_ci ~ "dec_sig",
+                                     CI_low_full > slr + slr_ci  ~ "inc_sig",
+                                     rate_full < slr ~ "dec_nonsig",
+                                     rate_full > slr ~ "inc_nonsig",
+                                     TRUE ~ "nonsig"))
+        
+        
+
+        # get the correct order of SETs for the summary graph:
+        
+        # first: no NAs in either column; use user-friendly SET ID and put it in order
+        if(!anyNA(to_plo$numerical_order) & !anyNA(to_plo$user_friendly_set_name)){
                 a <- forcats::fct_reorder(to_plo$user_friendly_set_name,
                                           desc(to_plo$numerical_order))
                 to_plo$graph_set_name <- a
                 
-                # if only a numerical order is provided, but no user-friendly set names:
-        } else if (sum(is.na(to_plo$numerical_order)) == 0) {
-                
-                # put (non-user-friendly) SET ID in order according to user-provided numerical order
+        # second: no NAs in numerical_order only: use set_id, but put it in order
+        } else if (!anyNA(to_plo$numerical_order)) {
                 b <- forcats::fct_reorder(to_plo$set_id,
                                           desc(to_plo$numerical_order))
                 to_plo$graph_set_name <- b
+            
                 
-                
-                # if neither are given, just use set names but make them factors and reverse them so the first in the alphabet will be at the top
+        # last: if neither are given, just use set names but make them factors and reverse them so the first in the alphabet will be at the top
         } else {
                 c <- factor(to_plo$set_id)
                 d <- forcats::fct_relevel(c, rev)
@@ -81,7 +145,21 @@ for(i in seq_along(reserves)){
         }
         
         
-        # make the plot
+        
+        # perform cumulative change calculations and get the correct SET order for the cumulative change graph (only using SET ID for now)
+        cumu_temp <- calc_change_cumu(to_calc)
+        set_temp <- cumu_temp$set
+        if (!anyNA(to_plo$numerical_order)){
+          mdat_sub <- select(to_plo, set_id, numerical_order)
+          set_temp <- left_join(set_temp, mdat_sub) %>% 
+            mutate(set_id = fct_reorder(set_id, numerical_order)) %>% 
+            select(-numerical_order)
+          }    
+        
+
+        # make the plots
+        
+        ### STAR WARS PLOT
         p <- ggplot() +
                 geom_blank(data = to_plo, 
                            aes(x = graph_set_name, 
@@ -122,6 +200,103 @@ for(i in seq_along(reserves)){
         filename <- paste0(reserves[i], "_summary_plot.png")
         out_path <- here::here("R_output", "figures", "summary_plots", filename)
         ggsave(filename = out_path, plot = p)
+        
+        
+        
+        ### CUMULATIVE CHANGE GRAPH
+        q <- plot_cumu_set(cumu_temp$set) +
+          ggtitle(paste0(reserves[i], ", Cumulative Change since first reading"))
+        
+        # print and save it
+        print(q)
+        filename <- paste0(reserves[i], "_cumu_change_plot.png")
+        out_path <- here::here("R_output", "figures", "cumu_change_plots", filename)
+        ggsave(filename = out_path, plot = q)
+        
+        
+        
+        ### MAPS
+        
+        # build the map - comparison to 0
+        m0 <- leaflet(to_map,
+                      options = leafletOptions(zoomControl = FALSE)) %>%
+          ### base layer options
+          addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+          ### Compared to 0 
+          addMarkers(icon = icon_nonsiga,
+                     lng = ~long[to_map$dir_0 == "nonsig"],
+                     lat = ~lat[to_map$dir_0 == "nonsig"]) %>%
+          addMarkers(icon = icon_inc_siga,
+                     lng = ~long[to_map$dir_0 == "inc_sig"],
+                     lat = ~lat[to_map$dir_0 == "inc_sig"]) %>%
+          addMarkers(icon = icon_dec_siga,
+                     lng = ~long[to_map$dir_0 == "dec_sig"],
+                     lat = ~lat[to_map$dir_0 == "dec_sig"]) %>% 
+          addMarkers(icon = icon_inc_nonsiga,
+                     lng = ~long[to_map$dir_0 == "inc_nonsig"],
+                     lat = ~lat[to_map$dir_0 == "inc_nonsig"]) %>%  
+          addMarkers(icon = icon_dec_nonsiga,
+                     lng = ~long[to_map$dir_0 == "dec_nonsig"],
+                     lat = ~lat[to_map$dir_0 == "dec_nonsig"]) %>% 
+          ### dress up the map
+          addScaleBar() %>%
+          addLegend(title = "Compared to 0",
+                    position = "bottomright",
+                    colors = map_pal,
+                    values = c(1:length(map_pal)),
+                    labels = c("lower; CIs don't overlap", "higher; CIs don't overlap", "CIs overlap"),
+                    opacity = 0.8) 
+        
+        # save it out
+        file_name <- paste0(reserves[i], "_map0.png")
+        file_path1 <- here::here("R_output", "figures", "maps", file_name)
+        mapview::mapshot(m0, file = file_path1)
+        
+        # pull in the image and print it
+        knitr::include_graphics(file_path1)
+        
+        
+        
+        
+        # build the map - comparison to SLR
+        mSLR <- leaflet(to_map,
+                        options = leafletOptions(zoomControl = FALSE)) %>%
+          ### base layer options
+          addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+          ### Compared to SLR 
+          addMarkers(icon = icon_nonsiga,
+                     lng = ~long[to_map$dir_slr == "nonsig"],
+                     lat = ~lat[to_map$dir_slr == "nonsig"]) %>%
+          addMarkers(icon = icon_inc_siga,
+                     lng = ~long[to_map$dir_slr == "inc_sig"],
+                     lat = ~lat[to_map$dir_slr == "inc_sig"]) %>%
+          addMarkers(icon = icon_dec_siga,
+                     lng = ~long[to_map$dir_slr == "dec_sig"],
+                     lat = ~lat[to_map$dir_slr == "dec_sig"]) %>% 
+          addMarkers(icon = icon_inc_nonsiga,
+                     lng = ~long[to_map$dir_slr == "inc_nonsig"],
+                     lat = ~lat[to_map$dir_slr == "inc_nonsig"]) %>%  
+          addMarkers(icon = icon_dec_nonsiga,
+                     lng = ~long[to_map$dir_slr == "dec_nonsig"],
+                     lat = ~lat[to_map$dir_slr == "dec_nonsig"]) %>% 
+          ### dress up the map
+          addScaleBar() %>%
+          addLegend(title = "Compared to Sea Level Rise",
+                    position = "bottomright",
+                    colors = map_pal,
+                    values = c(1:length(map_pal)),
+                    labels = c("lower; CIs don't overlap", "higher; CIs don't overlap", "CIs overlap"),
+                    opacity = 0.8) 
+        
+        # save it out
+        file_name <- paste0(reserves[i], "_mapSLR.png")
+        file_path2 <- here::here("R_output", "figures", "maps", file_name)
+        mapview::mapshot(mSLR, file = file_path2)
+        
+        # pull in the image and print it
+        # pull in the image and print it
+        knitr::include_graphics(file_path2)
+        
 }
 
 ```
