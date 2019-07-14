@@ -199,7 +199,7 @@ for(i in seq_along(reserves)){
         print(p)
         filename <- paste0(reserves[i], "_summary_plot.png")
         out_path <- here::here("R_output", "figures", "summary_plots", filename)
-        ggsave(filename = out_path, plot = p)
+        ggsave(filename = out_path, plot = p, width = 7, height = 5, units = "in")
         
         
         
@@ -211,7 +211,7 @@ for(i in seq_along(reserves)){
         print(q)
         filename <- paste0(reserves[i], "_cumu_change_plot.png")
         out_path <- here::here("R_output", "figures", "cumu_change_plots", filename)
-        ggsave(filename = out_path, plot = q)
+        ggsave(filename = out_path, plot = q, width = 7, height = 8, units = "in")
         
         
         
