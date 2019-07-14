@@ -10,6 +10,11 @@ output:
 6/26/19 - Have updated site names in a few data/metadata files, so am rerunning this.
 -- Have also inserted code to wrangle and combine metadata files.  
 
+7/14/19 - another update, for metadata only:  
+
++  pulling out NAVD88 Ground and Receiver elevation. There is some confusion about what each one represents but it can still be useful as a y-axis to see relative change related to elevation. 9 reserves have NAVD88 receiver elevations and 6 have ground. 2 of the ones that have ground elevation have *only* that, and not receiver elevation - so 11 reserves (12 once I insert GND's into our metadata) have *something*.  
++  PDB has different "user-friendly SET names"  
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -157,9 +162,11 @@ for(i in seq_along(raw_files)){
                        set_type,
                        lat = latitude_dec_deg,
                        long = longitude_dec_deg,
+                       navd88_ground = surface_elevation_ground_navd88,
+                       navd88_receiver = surface_elevation_receiver_navd88,
                        starts_with("co_dominant_species"),
                        general_salinity) %>% 
-                mutate_at(c("reserve", "set_id", "user_friendly_set_name", "general_salinity"), as.character) 
+                mutate_at(c("reserve", "set_id", "user_friendly_set_name", "general_salinity", "navd88_ground", "navd88_receiver"), as.character) 
         combined_list[[i]] <- dat
 }
 
