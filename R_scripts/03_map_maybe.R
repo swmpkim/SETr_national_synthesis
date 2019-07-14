@@ -1,11 +1,15 @@
 library(dplyr)
 library(here)
 library(leaflet)
+library(mapview)
 
 # read in the points for the map
 in_path <- here::here("data", "intermediate", "locations.csv")
 loc_dat <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
         arrange(reserve) # make sure it's alphabetical because file lists for icons will be
+loc_dat$regions <- c("gulf", "midatl", "midatl", "midatl", "west", "gulf",
+                     "ne", "gulf", "ne", "west", "west", "ne", "gulf",
+                     "ne")
 
 
 # look for pie charts here
@@ -15,16 +19,10 @@ in_path <- here::here("R_output", "figures", "for_maps")
 file_paths_0 <- dir(in_path, pattern = "dir_0.svg", full.names = TRUE)
 file_paths_slr <- dir(in_path, pattern = "dir_slr.svg", full.names = TRUE)
 
-# name those vectors in case I want to subset to regions
-names(file_paths_slr) <- substr(file_paths_slr, 
-                                nchar(file_paths_slr) - 14, 
-                                nchar(file_paths_slr) - 12)
-names(file_paths_0) <- substr(file_paths_0, 
-                                nchar(file_paths_0) - 12, 
-                                nchar(file_paths_0) - 10)
 
-# refer to subsetted icons like this, or something
-file_paths_0[names(file_paths_0) %in% "APA"]  # where "APA" would be the subset of reserves we care about
+# turn those into columns in the main data frame, so the correct icons get used during subsetting
+loc_dat$file_paths_0 <- file_paths_0
+loc_dat$file_paths_slr <- file_paths_slr
 
 
 # set up the color palette and labels for the legend
@@ -34,7 +32,53 @@ names(to_color) <- c("Lower, CIs don't overlap", "Lower, CIs overlap",
                      "Higher, CIs overlap", "Higher, CIs don't overlap")
 
 
-# make maps, using each icon for its associated location
+###### each region
+
+subsets <- c("ne", "midatl", "gulf", "west")
+
+for(i in seq_along(subsets)){
+        to_map <- loc_dat[loc_dat$regions == subsets[i], ]
+        
+        map_0 <- leaflet(to_map) %>% 
+                addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+                addMarkers(data = to_map,
+                           lng = ~long,
+                           lat = ~lat,
+                           icon = ~icons(
+                                   iconUrl = file_paths_0,
+                                   iconHeight = 50,
+                                   iconWidth = 50
+                           )) %>% 
+                addLegend(colors = to_color,
+                          labels = names(to_color),
+                          position = "bottomleft",
+                          opacity = 0.9,
+                          title = "Compared to 0")
+        file_out <- paste0("map0_", subsets[i], ".png")
+        out_path <- here::here("R_output", "figures", "maps", file_out)
+        mapshot(map_0, file = out_path)
+        
+        map_slr <- leaflet(to_map) %>% 
+                addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+                addMarkers(data = to_map,
+                           lng = ~long,
+                           lat = ~lat,
+                           icon = ~icons(
+                                   iconUrl = file_paths_slr,
+                                   iconHeight = 50,
+                                   iconWidth = 50
+                           )) %>% 
+                addLegend(colors = to_color,
+                          labels = names(to_color),
+                          position = "bottomleft",
+                          opacity = 0.9,
+                          title = "Compared to long-term SLR")
+        file_out <- paste0("mapSLR_", subsets[i], ".png")
+        out_path <- here::here("R_output", "figures", "maps", file_out)
+        mapshot(map_slr, file = out_path)
+}
+
+#### national level
 
 # compared to 0
 map_0 <- leaflet(loc_dat) %>% 
@@ -53,7 +97,8 @@ map_0 <- leaflet(loc_dat) %>%
                   opacity = 0.9,
                   title = "Compared to 0")
 map_0
-
+out_path <- here::here("R_output", "figures", "maps", "map0_all.png")
+mapshot(map_0, file = out_path)
 
 # compared to sea level rise
 map_slr <- leaflet(loc_dat) %>% 
@@ -72,3 +117,5 @@ map_slr <- leaflet(loc_dat) %>%
                   opacity = 0.9,
                   title = "Compared to long-term SLR")
 map_slr
+out_path <- here::here("R_output", "figures", "maps", "mapSLR_all.png")
+mapshot(map_slr, file = out_path)
