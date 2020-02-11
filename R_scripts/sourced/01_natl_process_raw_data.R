@@ -10,14 +10,17 @@
 dat <- file_path %>% 
         excel_sheets() %>% 
         set_names() %>% 
-        map_df( ~ read_excel(path = file_path, sheet = .x), .id = "sheet")
+        map_df( ~ read_excel(path = file_path, 
+                             sheet = .x, 
+                             col_types = "text"), 
+                .id = "sheet")
 
 # check to make sure the SET ID that was entered matches the name of each sheet
 mismatches <- dat$set_id != dat$sheet
 
 # make this whole script stop if something doesn't match
 if(sum(mismatches) > 0){
-        print(dat[mismatches, c("sheet", "set_id", "date", "arm_position")])
+        print(dat[mismatches, c("sheet", "set_id", "year", "month", "arm_position")])
         stop("There are SET IDs that do not match the sheet name. Please check and correct the rows printed above before proceeding.")
         }else{
 # if no problem, do everything else
@@ -40,7 +43,7 @@ names(dat_formatted) <- gsub("height_", "height", names(dat_formatted))
 
 # set up to pivot
 spec <- dat_formatted %>% 
-        pivot_longer_spec(
+        build_longer_spec(
                 cols = starts_with("pin1_height"):"pin9_qaqccode",
                 names_to = c("pinnumber", ".value"),
                 names_sep = "_"
@@ -48,7 +51,7 @@ spec <- dat_formatted %>%
 
 # pivot to longer
 dat_long <- dat_formatted %>% 
-        pivot_longer(spec = spec)
+        pivot_longer_spec(spec = spec)
 
 # put underscores back in the names
 names(dat_long) <- gsub("pin", "pin_", names(dat_long))
