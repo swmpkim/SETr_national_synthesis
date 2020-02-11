@@ -100,7 +100,7 @@ for(i in seq_along(subsets)){
                           title = "Compared to 19-year water level change")
         file_out <- paste0("map19yr_", subsets[i], ".png")
         out_path <- here::here("R_output", "figures", "maps", file_out)
-        mapshot(map_slr, file = out_path)
+        mapshot(map_19yr, file = out_path)
 }
 
 #### national level
