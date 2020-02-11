@@ -6,6 +6,7 @@ output:
         html_document:
                 toc: yes
 ---
+2/11/2020 - have updated all data files; they should be all set. About to run this with everything being up-to-date. have also replaced the sourced "000_functions.R" file with the most up-to-date one. Also made some updates in processing script due to tidyr updates. Everything worked running step by step, so I'm going to knit this and keep the record. But data should be all set now.    
 
 6/26/19 - Have updated site names in a few data/metadata files, so am rerunning this.
 -- Have also inserted code to wrangle and combine metadata files.  
@@ -119,6 +120,8 @@ unique(dat_all$set_id)
 Get all of the pin heights into mm and get rid of anything where date doesn't exist.
 
 ```{r}
+# this only works because we have some of each
+# it threw an error when I was testing with only files that have height_mm
 dat_all2 <- dat_all %>% 
         mutate(pin_height = case_when(!is.na(height_mm) ~ height_mm,
                                       !is.na(height_cm) ~ 10 * height_cm),
@@ -127,6 +130,16 @@ dat_all2 <- dat_all %>%
                arm_pin = paste0(arm_position, "-", pin_number)) %>% 
         select(-starts_with("height")) %>% 
         filter(!is.na(date))
+
+# some of these failed to parse; check out what's going on
+failed_parsing <- anti_join(dat_all, dat_all2)
+glimpse(failed_parsing)
+
+# looks like a bunch of missing measurements - because there are no dates
+# make sure
+sum(is.na(dat_all$year))
+sum(is.na(dat_all$year)) == nrow(failed_parsing)
+# okay
 ```
 
 Write out to a csv for later use.  
