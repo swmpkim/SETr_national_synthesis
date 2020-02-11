@@ -58,41 +58,11 @@ reserves <- unique(dat_rates$reserve)
 ```
 
 
-```{r map_prep}
-# read in images to use as map icons
-icon_inc_sig_path <- here::here("img", "blue_up_arrow.png")
-icon_dec_sig_path <- here::here("img", "red_down_arrow.png")
-icon_inc_nonsig_path <- here::here("img", "gray_up_arrow.png")
-icon_dec_nonsig_path <- here::here("img", "gray_down_arrow.png")
-icon_nonsig_path <- here::here("img", "gray_dash.png")
-
-# make the icons
-icon_inc_siga <- icon_inc_sigb <- makeIcon(iconUrl = icon_inc_sig_path, 
-                                           iconWidth = 30, 
-                                           iconHeight = 35)
-icon_dec_siga <- icon_dec_sigb <- makeIcon(iconUrl = icon_dec_sig_path, 
-                                           iconWidth = 30, 
-                                           iconHeight = 35)
-icon_inc_nonsiga <- icon_inc_nonsigb <- makeIcon(iconUrl = icon_inc_nonsig_path, 
-                                                 iconWidth = 30, 
-                                                 iconHeight = 35)
-icon_dec_nonsiga <- icon_dec_nonsigb <- makeIcon(iconUrl = icon_dec_nonsig_path, 
-                                                 iconWidth = 30, 
-                                                 iconHeight = 35)
-icon_nonsiga <- icon_nonsigb <- makeIcon(iconUrl = icon_nonsig_path, 
-                                         iconWidth = 25, 
-                                         iconHeight = 12)
-
-
-# specify what these colors are, for the legends
-map_pal <- c("#c00000", "#2f5597", "#7f7f7f")
-```
-
 Loop through reserves and:  
 
 +  create the "star wars" rate summary graph  
 +  perform cumulative change calculations and make that graph  
-+  make a map
++  print the maps
 
 ```{r}
 for(i in seq_along(reserves)){
@@ -107,21 +77,6 @@ for(i in seq_along(reserves)){
         slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x_95_ci"])
         
         
-        # generate some comparisons for the maps
-        to_map <- to_plo %>% 
-          mutate(dir_0 = case_when(CI_high_full < 0 ~ "dec_sig",
-                                   CI_low_full > 0  ~ "inc_sig",
-                                   rate_full < 0 ~ "dec_nonsig",
-                                   rate_full > 0 ~ "inc_nonsig",
-                                   TRUE ~ "nonsig"),
-                 dir_slr = case_when(CI_high_full < slr - slr_ci ~ "dec_sig",
-                                     CI_low_full > slr + slr_ci  ~ "inc_sig",
-                                     rate_full < slr ~ "dec_nonsig",
-                                     rate_full > slr ~ "inc_nonsig",
-                                     TRUE ~ "nonsig"))
-        
-        
-
         # get the correct order of SETs for the summary graph:
         
         # first: no NAs in either column; use user-friendly SET ID and put it in order
@@ -160,40 +115,43 @@ for(i in seq_along(reserves)){
         # make the plots
         
         ### STAR WARS PLOT
-        p <- ggplot() +
-                geom_blank(data = to_plo, 
-                           aes(x = graph_set_name, 
-                               y = rate_full)) +
-                geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
-                                ymin = slr-slr_ci, 
-                                ymax = slr+slr_ci), 
-                            fill = "navyblue", 
-                            alpha = 0.1) +
-                geom_hline(aes(yintercept = slr), 
-                           col = "navyblue", 
-                           size = 1, 
-                           alpha = 0.9) +
-                geom_hline(aes(yintercept = 0), 
-                           col = "gray70") +
-                geom_errorbar(data = to_plo, 
-                              aes(x = graph_set_name, 
-                                  ymin = CI_low_full, 
-                                  ymax = CI_high_full), 
-                              col = "gray55", 
-                              size = 1) +
-                geom_point(data = to_plo, 
-                           aes(x = graph_set_name, 
-                               y = rate_full), 
-                           size = 3, 
-                           col = "red3") +
-                theme_classic() + 
-                labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
-                     subtitle = paste0("Local SLR in blue: ", 
-                                       slr, " +/- ", 
-                                       slr_ci, " mm/yr"), 
-                     x = "SET", 
-                     y = "Rate of change (mm/yr)") +
-                coord_flip()
+        # deal with new args
+        p <- plot_rate_comps(set_temp)
+          
+          # ggplot() +
+          #       geom_blank(data = to_plo, 
+          #                  aes(x = graph_set_name, 
+          #                      y = rate_full)) +
+          #       geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
+          #                       ymin = slr-slr_ci, 
+          #                       ymax = slr+slr_ci), 
+          #                   fill = "navyblue", 
+          #                   alpha = 0.1) +
+          #       geom_hline(aes(yintercept = slr), 
+          #                  col = "navyblue", 
+          #                  size = 1, 
+          #                  alpha = 0.9) +
+          #       geom_hline(aes(yintercept = 0), 
+          #                  col = "gray70") +
+          #       geom_errorbar(data = to_plo, 
+          #                     aes(x = graph_set_name, 
+          #                         ymin = CI_low_full, 
+          #                         ymax = CI_high_full), 
+          #                     col = "gray55", 
+          #                     size = 1) +
+          #       geom_point(data = to_plo, 
+          #                  aes(x = graph_set_name, 
+          #                      y = rate_full), 
+          #                  size = 3, 
+          #                  col = "red3") +
+          #       theme_classic() + 
+          #       labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
+          #            subtitle = paste0("Local SLR in blue: ", 
+          #                              slr, " +/- ", 
+          #                              slr_ci, " mm/yr"), 
+          #            x = "SET", 
+          #            y = "Rate of change (mm/yr)") +
+          #       coord_flip()
        
         # print and save the plot 
         print(p)
@@ -217,83 +175,16 @@ for(i in seq_along(reserves)){
         
         ### MAPS
         
-        # build the map - comparison to 0
-        m0 <- leaflet(to_map,
-                      options = leafletOptions(zoomControl = FALSE)) %>%
-          ### base layer options
-          addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
-          ### Compared to 0 
-          addMarkers(icon = icon_nonsiga,
-                     lng = ~long[to_map$dir_0 == "nonsig"],
-                     lat = ~lat[to_map$dir_0 == "nonsig"]) %>%
-          addMarkers(icon = icon_inc_siga,
-                     lng = ~long[to_map$dir_0 == "inc_sig"],
-                     lat = ~lat[to_map$dir_0 == "inc_sig"]) %>%
-          addMarkers(icon = icon_dec_siga,
-                     lng = ~long[to_map$dir_0 == "dec_sig"],
-                     lat = ~lat[to_map$dir_0 == "dec_sig"]) %>% 
-          addMarkers(icon = icon_inc_nonsiga,
-                     lng = ~long[to_map$dir_0 == "inc_nonsig"],
-                     lat = ~lat[to_map$dir_0 == "inc_nonsig"]) %>%  
-          addMarkers(icon = icon_dec_nonsiga,
-                     lng = ~long[to_map$dir_0 == "dec_nonsig"],
-                     lat = ~lat[to_map$dir_0 == "dec_nonsig"]) %>% 
-          ### dress up the map
-          addScaleBar() %>%
-          addLegend(title = "Compared to 0",
-                    position = "bottomright",
-                    colors = map_pal,
-                    values = c(1:length(map_pal)),
-                    labels = c("lower; CIs don't overlap", "higher; CIs don't overlap", "CIs overlap"),
-                    opacity = 0.8) 
-        
-        # save it out
-        file_name <- paste0(reserves[i], "_map0.png")
-        file_path1 <- here::here("R_output", "figures", "maps", file_name)
-        mapview::mapshot(m0, file = file_path1)
-        
-        # pull in the image and print it
-        knitr::include_graphics(file_path1)
+        # comparison to 0
         
         
+        # comparison to long-term SLR
         
         
-        # build the map - comparison to SLR
-        mSLR <- leaflet(to_map,
-                        options = leafletOptions(zoomControl = FALSE)) %>%
-          ### base layer options
-          addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
-          ### Compared to SLR 
-          addMarkers(icon = icon_nonsiga,
-                     lng = ~long[to_map$dir_slr == "nonsig"],
-                     lat = ~lat[to_map$dir_slr == "nonsig"]) %>%
-          addMarkers(icon = icon_inc_siga,
-                     lng = ~long[to_map$dir_slr == "inc_sig"],
-                     lat = ~lat[to_map$dir_slr == "inc_sig"]) %>%
-          addMarkers(icon = icon_dec_siga,
-                     lng = ~long[to_map$dir_slr == "dec_sig"],
-                     lat = ~lat[to_map$dir_slr == "dec_sig"]) %>% 
-          addMarkers(icon = icon_inc_nonsiga,
-                     lng = ~long[to_map$dir_slr == "inc_nonsig"],
-                     lat = ~lat[to_map$dir_slr == "inc_nonsig"]) %>%  
-          addMarkers(icon = icon_dec_nonsiga,
-                     lng = ~long[to_map$dir_slr == "dec_nonsig"],
-                     lat = ~lat[to_map$dir_slr == "dec_nonsig"]) %>% 
-          ### dress up the map
-          addScaleBar() %>%
-          addLegend(title = "Compared to Sea Level Rise",
-                    position = "bottomright",
-                    colors = map_pal,
-                    values = c(1:length(map_pal)),
-                    labels = c("lower; CIs don't overlap", "higher; CIs don't overlap", "CIs overlap"),
-                    opacity = 0.8) 
+        # comparison to 19-year change
         
-        # save it out
-        file_name <- paste0(reserves[i], "_mapSLR.png")
-        file_path2 <- here::here("R_output", "figures", "maps", file_name)
-        mapview::mapshot(mSLR, file = file_path2)
         
-        # pull in the image and print it
+        # pull in the images and print them?
         # knitr::include_graphics(file_path2)
         
 }
