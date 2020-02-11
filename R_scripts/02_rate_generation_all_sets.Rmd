@@ -3,11 +3,15 @@ title: "Generating rates of change and CIs for all SETs"
 author: "Kim Cressman"
 date: "`r Sys.Date()`"
 output:
+  word_document:
+    toc: true
+    toc_depth: 2
   pdf_document:
     toc: yes
   html_document:
     toc: yes
     toc_float: yes
+always_allow_html: yes
 ---
 
 
@@ -137,27 +141,29 @@ length(unique(to_analyze$reserve))
 
 # Generate rates  
 
-Run fully specified models; as seen in `99_model_testing_all_sets`, rates and CIs come out almost identical whether you specify pins nested within arms as random effects, or only specify pins as random effects. So here, we'll use the nesting.    
+Run random-intercept LMMs as in the main project: fixed effect = date; random effects = pin nested within arm.  
 
 ```{r}
-models_fully_nested <- to_analyze %>%
+models2 <- to_analyze %>%
     group_by(reserve, set_id) %>%
-    do(mod = lme(pin_height ~ date, data = ., random = ~1|arm_position/arm_pin, na.action = na.omit))
+    do(mod = lme(pin_height ~ date, data = ., random = ~1|arm_position/pin_number, na.action = na.omit))
 ```
 
 Pull out information from the models.  
 
 ```{r}
-lmm_out_full <- models_fully_nested %>% 
-  mutate(rate_full = intervals(mod, which = "fixed")$fixed["date", 2] * 365.25,
-         CI_low_full = intervals(mod, which = "fixed")$fixed["date", 1] * 365.25,
-         CI_high_full = intervals(mod, which = "fixed")$fixed["date", 3] * 365.25) %>% 
+lmm_out <- models2 %>% 
+  mutate(rate = intervals(mod, which = "fixed")$fixed["date", 2] * 365.25,
+         CI_low = intervals(mod, which = "fixed")$fixed["date", 1] * 365.25,
+         CI_high = intervals(mod, which = "fixed")$fixed["date", 3] * 365.25) %>% 
   select(-mod)
 ```
 
 ```{r}
-lmm_out_full %>%  
-  knitr::kable(digits = 4)
+lmm_out %>% 
+  flextable() %>% 
+  theme_booktabs() %>% 
+  autofit()
 ```
 
 ***
@@ -168,8 +174,15 @@ lmm_out_full %>%
 Need to do a full join; there are some sites in the data that aren't in metadata; and some sites in metadata that didn't have enough data to be analyzed but we can put them on a map with some icon.  
 
 ```{r}
-all_out <- full_join(mdat, lmm_out_full, by = c("reserve", "set_id"))
+all_out <- full_join(mdat, lmm_out, by = c("reserve", "set_id"))
 ```
+
+Write that out to a file.  
+
+```{r}
+write.csv(all_out, here::here("data", "intermediate", "all_rates_and_metadata.csv"))
+```
+
 
 Get rid of any sites that are missing *both* a rate and a location.  
 
@@ -177,7 +190,7 @@ Get rid of any sites that are missing *both* a rate and a location.
 # find 'em
 ditch <- all_out %>% 
   filter(is.na(lat),
-         is.na(rate_full)) %>% 
+         is.na(rate)) %>% 
   select(reserve, set_id)
 
 # ditch 'em
@@ -196,12 +209,18 @@ slr_rates <- read.csv(slr_path, stringsAsFactors = FALSE) %>%
 
 to_join <- slr_rates %>% 
   mutate(slr_CI_low = slr_rate_mm_yr - x_95_ci,
-         slr_CI_high = slr_rate_mm_yr + x_95_ci) %>% 
+         slr_CI_high = slr_rate_mm_yr + x_95_ci,
+         yr19_CI_low = slr_19yr - ci95_19yr,
+         yr19_CI_high = slr_19yr + ci95_19yr) %>% 
   select(reserve, 
          slr_rate = slr_rate_mm_yr,
          slr_CI_low,
          slr_CI_high,
+         slr_19yr,
+         yr19_CI_low,
+         yr19_CI_high,
          slr_start = data_start,
+         yr19_start,
          slr_end = data_end)
 
 all_to_compare <- left_join(all_out, to_join, by = "reserve") 
@@ -211,20 +230,31 @@ Weed out some columns; generate comparison columns for both 0 and slr.
 
 ```{r}
 rates_comp <- all_to_compare %>% 
-  select(reserve, set_id, user_friendly_set_name, numerical_order,
-         lat, long, rate = rate_full, CI_low = CI_low_full, CI_high = CI_high_full,
-         slr_rate, slr_CI_low, slr_CI_high) %>% 
-  mutate(dir_0 = case_when(CI_high < 0 ~ "lower_sig",
-                             CI_low > 0  ~ "higher_sig",
-                             rate < 0 ~ "lower_nonsig",
-                             rate > 0 ~ "higher_nonsig",
+  select(reserve, 
+         set_id, 
+         user_friendly_set_name, 
+         numerical_order,
+         lat, long, 
+         rate, CI_low, CI_high,
+         slr_rate, slr_CI_low, slr_CI_high,
+         slr_19yr, yr19_CI_low, yr19_CI_high) %>% 
+  mutate(dir_0 = case_when(CI_high < 0 ~ "dec_sig",
+                           CI_low > 0  ~ "inc_sig",
+                           rate < 0 ~ "dec_nonsig",
+                           rate > 0 ~ "inc_nonsig",
+                           TRUE ~ "not_enough_info"),
+         dir_slr = case_when(CI_high < slr_CI_low ~ "dec_sig",
+                             CI_low > slr_CI_high  ~ "inc_sig",
+                             rate < slr_rate ~ "dec_nonsig",
+                             rate > slr_rate ~ "inc_nonsig",
                              TRUE ~ "not_enough_info"),
-           dir_slr = case_when(CI_high < slr_CI_low ~ "lower_sig",
-                               CI_low > slr_CI_high  ~ "higher_sig",
-                               rate < slr_rate ~ "lower_nonsig",
-                               rate > slr_rate ~ "higher_nonsig",
-                               TRUE ~ "not_enough_info"),
-         set_to_slr = rate / slr_rate) 
+         dir_19yr = case_when(CI_high < yr19_CI_low ~ "dec_sig",
+                              CI_low > yr19_CI_high  ~ "inc_sig",
+                              rate < slr_19yr ~ "dec_nonsig",
+                              rate > slr_19yr ~ "inc_nonsig",
+                              TRUE ~ "not_enough_info"),
+         set_to_slr = rate / slr_rate,
+         set_to_19yr = rate / slr_19yr) 
 ```
 
 
@@ -232,14 +262,15 @@ Summarize the categories.
 
 ```{r}
 rates_comp_summary <- rates_comp %>% 
-  select(reserve, set_id, dir_0, dir_slr) %>% 
+  select(reserve, set_id, dir_0, dir_slr, dir_19yr) %>% 
   gather(key = comparison, value = value, -reserve, -set_id) %>%
   group_by(reserve, comparison, value) %>% 
   summarize(total = n()) %>% 
   mutate(value = factor(value, levels = c( 
-                             "lower_sig", "lower_nonsig", 
+                             "dec_sig", "dec_nonsig", 
                              "not_enough_info", 
-                             "higher_nonsig", "higher_sig"))) 
+                             "inc_nonsig", "inc_sig"))) 
+
 ```
 
 
@@ -247,6 +278,12 @@ rates_comp_summary <- rates_comp %>%
 # set up color palette; associate it with the correct factor levels
 # from colorbrewer2.org, 5-class RdYlBu, substituting a gray for the yellow middle value:
 # to_color <- c("#d7191c", "#fdae61", "#f0f0f0", "#abd9e9", "#2c7bb6")
+
+
+# from reserve_template; these are the colors used
+# map_pal <- c("#c00000", "#2f5597", "#7f7f7f", "#fffacd")
+# okay the yellow and endpoints are the same below
+# this script also needs some intermediate colors; so it all matches. good.
 
 
 # dark colors consistent with map icons; mid red/blue from color brewer 5-class RdBu:
@@ -367,26 +404,28 @@ write.csv(rates_comp_summary, out_path, row.names = FALSE)
 
 Spoiler alert: some don't.  
 
+Not working on the 2/11/2020 run but I don't think it's worth troubleshooting - so I just commented it out.  
+
 ```{r, fig.width = 8, fig.height = 11, message = FALSE, warning = FALSE}
 
-ind_reserves <- unique(dat$reserve)
-
-for(i in seq_along(ind_reserves)){
-        to_plot <- filter(dat, reserve == ind_reserves[i])
-        p <- ggplot(to_plot) +
-                geom_point(aes(x = date, 
-                               y = pin_height, 
-                               col = as.factor(arm_position)),
-                           alpha = 0.5) +
-                geom_smooth(aes(x = date, y = pin_height), 
-                            method = "lm", 
-                            se = FALSE) +
-                facet_wrap(~ set_id, ncol = 4, scales = "free") +
-                labs(title = ind_reserves[i],
-                     color = "Arm Position") +
-                theme_bw()
-        print(p)
-}
+# ind_reserves <- unique(dat$reserve)
+# 
+# for(i in seq_along(ind_reserves)){
+#         to_plot <- filter(dat, reserve == ind_reserves[i])
+#         p <- ggplot(to_plot) +
+#                 geom_point(aes(x = date, 
+#                                y = pin_height, 
+#                                col = as.factor(arm_position)),
+#                            alpha = 0.5) +
+#                 geom_smooth(aes(x = date, y = pin_height), 
+#                             method = "lm", 
+#                             se = FALSE) +
+#                 facet_wrap(~ set_id, ncol = 4, scales = "free") +
+#                 labs(title = ind_reserves[i],
+#                      color = "Arm Position") +
+#                 theme_bw()
+#         print(p)
+# }
 
 ```
 
