@@ -8,8 +8,9 @@ in_path <- here::here("data", "intermediate", "locations.csv")
 loc_dat <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
         arrange(reserve) # make sure it's alphabetical because file lists for icons will be
 loc_dat$regions <- c("gulf", "midatl", "midatl", "midatl", "west", "gulf",
-                     "ne", "gulf", "ne", "west", "west", "ne", "gulf",
+                     "ne", "gulf", "gulf", "ne", "west", "west", "ne", "gulf",
                      "ne")
+# gtm isn't really the gulf but we seem to be the closest for mapping?
 
 
 # look for pie charts here
@@ -18,11 +19,13 @@ in_path <- here::here("R_output", "figures", "for_maps")
 # file names of pie charts for different purposes
 file_paths_0 <- dir(in_path, pattern = "dir_0.svg", full.names = TRUE)
 file_paths_slr <- dir(in_path, pattern = "dir_slr.svg", full.names = TRUE)
+file_paths_19yr <- dir(in_path, pattern = "dir_19yr.svg", full.names = TRUE)
 
 
 # turn those into columns in the main data frame, so the correct icons get used during subsetting
 loc_dat$file_paths_0 <- file_paths_0
 loc_dat$file_paths_slr <- file_paths_slr
+loc_dat$file_paths_19yr <- file_paths_19yr
 
 
 # set up the color palette and labels for the legend
@@ -58,6 +61,7 @@ for(i in seq_along(subsets)){
         out_path <- here::here("R_output", "figures", "maps", file_out)
         mapshot(map_0, file = out_path)
         
+        
         map_slr <- leaflet(to_map) %>% 
                 addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
                 addMarkers(data = to_map,
@@ -74,6 +78,27 @@ for(i in seq_along(subsets)){
                           opacity = 0.9,
                           title = "Compared to long-term SLR")
         file_out <- paste0("mapSLR_", subsets[i], ".png")
+        out_path <- here::here("R_output", "figures", "maps", file_out)
+        mapshot(map_slr, file = out_path)
+        
+        
+        
+        map_19yr <- leaflet(to_map) %>% 
+                addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+                addMarkers(data = to_map,
+                           lng = ~long,
+                           lat = ~lat,
+                           icon = ~icons(
+                                   iconUrl = file_paths_19yr,
+                                   iconHeight = 50,
+                                   iconWidth = 50
+                           )) %>% 
+                addLegend(colors = to_color,
+                          labels = names(to_color),
+                          position = "bottomleft",
+                          opacity = 0.9,
+                          title = "Compared to 19-year water level change")
+        file_out <- paste0("map19yr_", subsets[i], ".png")
         out_path <- here::here("R_output", "figures", "maps", file_out)
         mapshot(map_slr, file = out_path)
 }
@@ -119,3 +144,25 @@ map_slr <- leaflet(loc_dat) %>%
 map_slr
 out_path <- here::here("R_output", "figures", "maps", "mapSLR_all.png")
 mapshot(map_slr, file = out_path)
+
+
+
+# compared to 19-year water level change
+map_19yr <- leaflet(loc_dat) %>% 
+        addProviderTiles(leaflet::providers$Esri.WorldGrayCanvas) %>% 
+        addMarkers(data = loc_dat,
+                   lng = ~long,
+                   lat = ~lat,
+                   icon = ~icons(
+                           iconUrl = file_paths_19yr,
+                           iconHeight = 50,
+                           iconWidth = 50
+                   )) %>% 
+        addLegend(colors = to_color,
+                  labels = names(to_color),
+                  position = "bottomleft",
+                  opacity = 0.9,
+                  title = "Compared to 19-year water level change")
+map_slr
+out_path <- here::here("R_output", "figures", "maps", "map19yr_all.png")
+mapshot(map_19yr, file = out_path)
