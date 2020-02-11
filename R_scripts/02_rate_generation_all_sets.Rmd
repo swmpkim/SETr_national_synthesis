@@ -404,28 +404,26 @@ write.csv(rates_comp_summary, out_path, row.names = FALSE)
 
 Spoiler alert: some don't.  
 
-Not working on the 2/11/2020 run but I don't think it's worth troubleshooting - so I just commented it out.  
-
 ```{r, fig.width = 8, fig.height = 11, message = FALSE, warning = FALSE}
 
-# ind_reserves <- unique(dat$reserve)
-# 
-# for(i in seq_along(ind_reserves)){
-#         to_plot <- filter(dat, reserve == ind_reserves[i])
-#         p <- ggplot(to_plot) +
-#                 geom_point(aes(x = date, 
-#                                y = pin_height, 
-#                                col = as.factor(arm_position)),
-#                            alpha = 0.5) +
-#                 geom_smooth(aes(x = date, y = pin_height), 
-#                             method = "lm", 
-#                             se = FALSE) +
-#                 facet_wrap(~ set_id, ncol = 4, scales = "free") +
-#                 labs(title = ind_reserves[i],
-#                      color = "Arm Position") +
-#                 theme_bw()
-#         print(p)
-# }
+ind_reserves <- unique(dat$reserve)
+
+for(i in seq_along(ind_reserves)){
+        to_plot <- filter(dat, reserve == ind_reserves[i])
+        p <- ggplot(to_plot) +
+                geom_point(aes(x = date,
+                               y = pin_height,
+                               col = as.factor(arm_position)),
+                           alpha = 0.5) +
+                geom_smooth(aes(x = date, y = pin_height),
+                            method = "lm",
+                            se = FALSE) +
+                facet_wrap(~ set_id, ncol = 4, scales = "free") +
+                labs(title = ind_reserves[i],
+                     color = "Arm Position") +
+                theme_bw()
+        print(p)
+}
 
 ```
 
