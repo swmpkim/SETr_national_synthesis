@@ -38,17 +38,11 @@ dat_rates <- read.csv(in_path, stringsAsFactors = FALSE)
 
 in_path <- here::here("data", "intermediate", "rate_comparisons.csv")
 dat_slr_comps <- read.csv(in_path, stringsAsFactors = FALSE)
+# this has slr and 19-yr rates and CIs
 
 in_path <- here::here("data", "processed_combined", "all_sites.csv")
 dat_all <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
   mutate(date = lubridate::ymd(date))
-
-slr_path <- here::here("metadata", "slr_rates.csv")
-slr_rates <- read.csv(slr_path, stringsAsFactors = FALSE) %>% 
-  clean_names() %>% 
-  remove_empty(which = c("rows", "cols")) %>% 
-  mutate(slr_CI_low = slr_rate_mm_yr - x_95_ci,
-         slr_CI_high = slr_rate_mm_yr + x_95_ci)
 ```
 
 
@@ -70,12 +64,11 @@ for(i in seq_along(reserves)){
         # subset the data
         to_plo <- dat_rates[dat_rates$reserve == reserves[i], ]
         to_calc <- dat_all[dat_all$reserve == reserves[i], ]
+        to_compare <- dat_slr_comps[dat_slr_comps$reserve == reserves[i], 
+                                    c("slr_rate", "slr_CI_low", "slr_CI_high",
+                                      "slr_19yr", "yr19_CI_low", "yr19_CI_high")]
+        to_compare <- dplyr::distinct(to_compare)
 
-        
-        # pull SLR rate and CI out of metadata
-        slr <- unlist(slr_rates[slr_rates$reserve == reserves[i], "slr_rate_mm_yr"])
-        slr_ci <- unlist(slr_rates[slr_rates$reserve == reserves[i], "x_95_ci"])
-        
         
         # get the correct order of SETs for the summary graph:
         
@@ -114,44 +107,24 @@ for(i in seq_along(reserves)){
 
         # make the plots
         
-        ### STAR WARS PLOT
-        # deal with new args
-        p <- plot_rate_comps(set_temp)
+        # summary plot, not colored by veg
+        p <- plot_rate_comps(data = to_plo,
+                             plot_type = 4,
+                             set_ids = set_id,
+                             set_ci_low = CI_low,
+                             set_ci_high = CI_high,
+                             rates = rate,
+                             comp1 = to_compare$slr_rate,
+                             comp1_ci_low = to_compare$slr_CI_low,
+                             comp1_ci_high = to_compare$slr_CI_high,
+                             comp2 = to_compare$slr_19yr,
+                             comp2_ci_low = to_compare$yr19_CI_low,
+                             comp2_ci_high = to_compare$yr19_CI_high)
+        
+        p <- p +
+          ggtitle(paste0(reserves[i], ", Summary of SET rates of change"))
           
-          # ggplot() +
-          #       geom_blank(data = to_plo, 
-          #                  aes(x = graph_set_name, 
-          #                      y = rate_full)) +
-          #       geom_ribbon(aes(x = 0:(nrow(to_plo)+1), 
-          #                       ymin = slr-slr_ci, 
-          #                       ymax = slr+slr_ci), 
-          #                   fill = "navyblue", 
-          #                   alpha = 0.1) +
-          #       geom_hline(aes(yintercept = slr), 
-          #                  col = "navyblue", 
-          #                  size = 1, 
-          #                  alpha = 0.9) +
-          #       geom_hline(aes(yintercept = 0), 
-          #                  col = "gray70") +
-          #       geom_errorbar(data = to_plo, 
-          #                     aes(x = graph_set_name, 
-          #                         ymin = CI_low_full, 
-          #                         ymax = CI_high_full), 
-          #                     col = "gray55", 
-          #                     size = 1) +
-          #       geom_point(data = to_plo, 
-          #                  aes(x = graph_set_name, 
-          #                      y = rate_full), 
-          #                  size = 3, 
-          #                  col = "red3") +
-          #       theme_classic() + 
-          #       labs(title = paste0(reserves[i], ", Elevation Change, 95% Confidence Intervals (LMM)"), 
-          #            subtitle = paste0("Local SLR in blue: ", 
-          #                              slr, " +/- ", 
-          #                              slr_ci, " mm/yr"), 
-          #            x = "SET", 
-          #            y = "Rate of change (mm/yr)") +
-          #       coord_flip()
+
        
         # print and save the plot 
         print(p)
@@ -161,7 +134,38 @@ for(i in seq_along(reserves)){
         
         
         
+        # summary plot with veg
+        if(!anyNA(to_plo$co_dominant_species1)){
+          p <- plot_rate_comps(data = to_plo,
+                               plot_type = 4,
+                               set_ids = set_id,
+                               set_ci_low = CI_low,
+                               set_ci_high = CI_high,
+                               rates = rate,
+                               comp1 = to_compare$slr_rate,
+                               comp1_ci_low = to_compare$slr_CI_low,
+                               comp1_ci_high = to_compare$slr_CI_high,
+                               comp2 = to_compare$slr_19yr,
+                               comp2_ci_low = to_compare$yr19_CI_low,
+                               comp2_ci_high = to_compare$yr19_CI_high,
+                               color_by_veg = TRUE,
+                               veg = co_dominant_species1)
+          
+          p <- p +
+            ggtitle(paste0(reserves[i], ", Summary of SET rates of change"))
+          
+          # print and save the plot 
+          print(p)
+          filename <- paste0(reserves[i], "_summary_plot_veg.png")
+          out_path <- here::here("R_output", "figures", "summary_plots", filename)
+          ggsave(filename = out_path, plot = p, width = 9, height = 5, units = "in")
+        }
+        
+        
         ### CUMULATIVE CHANGE GRAPH
+        
+        # default has linear regression on it; i'll leave it because we don't need
+        # 10 versions of every graph for every reserve in this report
         q <- plot_cumu_set(cumu_temp$set) +
           ggtitle(paste0(reserves[i], ", Cumulative Change since first reading"))
         
@@ -173,21 +177,43 @@ for(i in seq_along(reserves)){
         
         
         
-        ### MAPS
+        # and the simplified version
         
-        # comparison to 0
+        # first have to get the sea level line set up
+        # generate a SET-specific intercept based on the first date of sampling at that SET
+        # also add in slope because geom_abline doesn't work otherwise
+        intercepts <- set_temp %>% 
+          group_by(set_id) %>% 
+          summarize(min_date = as.integer(min(date))) %>% 
+          mutate(intercept = 0 - (to_compare$slr_rate/365.25*min_date),
+                 slope = to_compare$slr_rate/365.25)
         
+        # now to graph it
+        q <- ggplot(set_temp, aes(x = date, y = mean_cumu)) +
+          geom_line(col = 'gray70') +
+          facet_wrap(~set_id, ncol = 4) +
+          labs(title = paste0(reserves[i], ", Cumulative Change since first reading"), 
+               subtitle = 'light gray represents data; blue has slope of SET change; \nred has slope of long-term sea level rise',
+               x = 'Date',
+               y = 'Change since first reading (mm)') +
+          theme_classic() +
+          geom_smooth(se = FALSE, method = 'lm', 
+                      col = 'steelblue4',
+                      size = 1) +
+          geom_abline(data = intercepts,
+                      aes(intercept = intercept,
+                          slope = slope),
+                      color = "red3",
+                      size = 1)
         
-        # comparison to long-term SLR
-        
-        
-        # comparison to 19-year change
-        
-        
-        # pull in the images and print them?
-        # knitr::include_graphics(file_path2)
+        print(q)
+        filename <- paste0(reserves[i], "_cumu_change_plot_simplified.png")
+        out_path <- here::here("R_output", "figures", "cumu_change_plots", filename)
+        ggsave(filename = out_path, plot = q, width = 7, height = 8, units = "in")
         
 }
 
 ```
 
+
+Not pulling the maps back in here because I'll just pull them in to the final report. Here I just want to verify that everything looks good.  
