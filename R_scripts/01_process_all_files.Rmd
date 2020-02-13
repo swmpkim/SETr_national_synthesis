@@ -6,6 +6,8 @@ output:
         html_document:
                 toc: yes
 ---
+2/12/2020 - I've received GPS coordinates for some SETs that didn't have them before (the NARUNH ones). Rerunning everything with these included.  
+
 2/11/2020 - have updated all data files; they should be all set. About to run this with everything being up-to-date. have also replaced the sourced "000_functions.R" file with the most up-to-date one. Also made some updates in processing script due to tidyr updates. Everything worked running step by step, so I'm going to knit this and keep the record. But data should be all set now.    
 
 6/26/19 - Have updated site names in a few data/metadata files, so am rerunning this.

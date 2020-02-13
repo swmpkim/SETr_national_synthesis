@@ -85,7 +85,7 @@ slr_rates <- dat_slr_comps %>%
         distinct() 
         
 
-comp_summary <- dat_slr_comps %>% 
+lt_summary <- dat_slr_comps %>% 
         group_by(reserve) %>% 
         summarize(total_SETs = n(),
                   exceeding_confident = sum(dir_slr == "inc_sig"),
@@ -95,11 +95,21 @@ comp_summary <- dat_slr_comps %>%
                   not_enough_info = sum(dir_slr == "not_enough_info")) %>%
         ungroup()
 
-long_term_slr_comp <- right_join(slr_rates, comp_summary, by = "reserve") %>% 
+long_term_slr_comp <- right_join(slr_rates, lt_summary, by = "reserve") %>% 
         select(-yr19_rate) %>% 
         arrange(Region, reserve)
 
-yr19_slr_comp <- right_join(slr_rates, comp_summary, by = "reserve") %>% 
+yr19_summary <- dat_slr_comps %>% 
+        group_by(reserve) %>% 
+        summarize(total_SETs = n(),
+                  exceeding_confident = sum(dir_19yr == "inc_sig"),
+                  exceeding_not_confident = sum(dir_19yr == "inc_nonsig"),
+                  NOT_exceeding_confident = sum(dir_19yr == "dec_sig"),
+                  NOT_exceeding_not_confident = sum(dir_19yr == "dec_nonsig"),
+                  not_enough_info = sum(dir_19yr == "not_enough_info")) %>%
+        ungroup()
+
+yr19_slr_comp <- right_join(slr_rates, yr19_summary, by = "reserve") %>% 
         select(-slr_rate) %>% 
         arrange(Region, reserve)
 ```
