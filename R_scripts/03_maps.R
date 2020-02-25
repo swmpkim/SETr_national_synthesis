@@ -7,10 +7,37 @@ library(mapview)
 in_path <- here::here("data", "intermediate", "locations.csv")
 loc_dat <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
         arrange(reserve) # make sure it's alphabetical because file lists for icons will be
-loc_dat$regions <- c("gulf", "midatl", "midatl", "midatl", "west", "gulf",
-                     "ne", "gulf", "gulf", "ne", "west", "west", "ne", "gulf",
-                     "ne")
+
+
+# regions: using same tribble from 05_tables etc.
 # gtm isn't really the gulf but we seem to be the closest for mapping?
+regions <- tribble(
+        ~reserve, ~full_name, ~state, ~regions,
+        "APA", "Apalachicola Bay", "FL", "gulf",
+        "CBM", "Chesapeake Bay, MD", "MD", "midatl",
+        "CBV", "Chesapeake Bay, VA", "VA", "midatl",
+        "DEL", "Delaware", "DE", "midatl",
+        "ELK", "Elkhorn Slough", "CA", "west",
+        "GND", "Grand Bay", "MS", "gulf",
+        "GRB", "Great Bay", "NH", "ne",
+        "GTM", "Guana Tolomato Matanzas", "FL", "gulf",
+        "MAR", "Mission Aransas", "TX", "gulf",
+        "NAR", "Narragansett Bay", "RI", "ne",
+        "NARUNH", "NAR - Univ of NH partner", "RI", "ne",
+        "PDB", "Padilla Bay", "WA", "west",
+        "SOS", "South Slough", "OR", "west",
+        "WEL", "Wells", "ME", "ne",
+        "WKB", "Weeks Bay", "AL", "gulf",
+        "WQB", "Waquoit Bay", "MA", "ne"
+)
+
+loc_dat <- left_join(loc_dat, regions, by = "reserve")
+
+# just remove NAR-UNH since there's not enough data
+# and it overwrites the NERR's pie chart
+loc_dat <- loc_dat %>% 
+        filter(reserve != "NARUNH")
+
 
 
 # look for pie charts here
