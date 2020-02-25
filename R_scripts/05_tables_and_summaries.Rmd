@@ -1,6 +1,5 @@
 ---
 title: "Tables and Summaries"
-author: "Kim Cressman"
 date: "`r Sys.Date()`"
 output:
   word_document: default
@@ -24,9 +23,9 @@ library(officer)
 ```
 
 
-Read in metadata, sea level files, and file with rates and CIs for each SET.  
-
 ```{r}
+# read in files
+
 in_path <- here::here("data", "intermediate", "rate_summary.csv")
 dat_rates <- read.csv(in_path, stringsAsFactors = FALSE)
 
@@ -37,9 +36,15 @@ dat_slr_comps <- read.csv(in_path, stringsAsFactors = FALSE)
 in_path <- here::here("data", "processed_combined", "all_sites.csv")
 dat_all <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
   mutate(date = lubridate::ymd(date))
+
+in_path <- here::here("metadata", "slr_rates.csv")
+slr_mdat <- read.csv(in_path, stringsAsFactors = FALSE) %>% 
+  janitor::clean_names()
 ```
 
-Table for regions:  
+# Summary of SETs in this analysis  
+
+Note: GTM is not on the gulf coast, but was grouped with this region for mapping purposes.  
 
 ```{r}
 regions <- tribble(
@@ -65,13 +70,63 @@ regions <- tribble(
 dat_slr_comps <- left_join(dat_slr_comps, regions, by = "reserve")
 ```
 
-Background:  
 
--  how many SETs?  
--  how long have they been measured?  
--  when?  
+```{r}
+slr_mdat_sub <- slr_mdat %>% 
+  select(reserve, nearest_nwlon_station, nwlon_station_number)
+  
+  
+  
+mdat <- dat_all %>% 
+  group_by(reserve) %>% 
+  summarize(n_sets = length(unique(set_id)),
+            first_sample_date = as.character(min(date)),
+            latest_sample_date = as.character(max(date)),
+            years_measured = round(max(date2) - min(date2), 2)) %>% 
+  left_join(regions, by = "reserve") %>% 
+  left_join(slr_mdat_sub, by = "reserve") %>% 
+  select(reserve, state, n_sets, nwlon_station_number,
+         first_sample_date, latest_sample_date, years_measured,
+         Region) %>% 
+  arrange(Region)
+```
 
--  NWLON station???  
+```{r}
+for_group_table <- as_grouped_data(mdat,
+                                   groups = c("Region"))
+
+
+mdat_table <- as_flextable(for_group_table) %>% 
+        bold(j = 1, i = ~ !is.na(Region), bold = TRUE, part = "body" ) %>% 
+        bold(part = "header", bold = TRUE ) %>% 
+        set_header_labels(
+                reserve = "Reserve",
+                state = "State",
+                n_sets = "# SETs",
+                nwlon_station_number = "Nearest NWLON Station",
+                first_sample_date = "First Sample Date",
+                latest_sample_date = "Last Sample Date",
+                years_measured = "# years measured")
+
+mdat_table <- mdat_table %>% 
+        bold(part = "header", bold = TRUE ) %>% 
+        fontsize(size = 10, part = "header") %>%
+        fontsize(size = 9, part = "body") %>% 
+        fontsize(size = 10, j = 1, i = ~ !is.na(Region), part = "body") 
+
+
+std_border = fp_border(color = "gray80", width = 1)
+mdat_table <- mdat_table %>% 
+  theme_zebra() %>% 
+  border_inner_v(part = "all", border = std_border) %>% 
+  border_outer(border = std_border, part = "all") %>% 
+  align(align = "center", part = "all") %>% 
+  align(align = "left", part = "body", i = ~ !is.na(Region)) %>% 
+  width(width = c(0.8, 0.8, 0.8, 1, 1, 1, 0.8))
+
+mdat_table
+```
+
 
 
 ```{r}

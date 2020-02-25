@@ -33,12 +33,6 @@ regions <- tribble(
 
 loc_dat <- left_join(loc_dat, regions, by = "reserve")
 
-# just remove NAR-UNH since there's not enough data
-# and it overwrites the NERR's pie chart
-loc_dat <- loc_dat %>% 
-        filter(reserve != "NARUNH")
-
-
 
 # look for pie charts here
 in_path <- here::here("R_output", "figures", "for_maps")
@@ -53,6 +47,12 @@ file_paths_19yr <- dir(in_path, pattern = "dir_19yr.svg", full.names = TRUE)
 loc_dat$file_paths_0 <- file_paths_0
 loc_dat$file_paths_slr <- file_paths_slr
 loc_dat$file_paths_19yr <- file_paths_19yr
+
+
+# remove NAR-UNH since there's not enough data
+# and it overwrites the NERR's pie chart
+loc_dat <- loc_dat %>% 
+        filter(reserve != "NARUNH")
 
 
 # set up the color palette and labels for the legend
