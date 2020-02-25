@@ -115,29 +115,6 @@ yr19_slr_comp <- right_join(slr_rates, yr19_summary, by = "reserve") %>%
 ```
 
 
-```{r}
-# try1 <- long_term_slr_comp %>% 
-#         flextable() %>% 
-#         set_header_labels(
-#                 Region = "Region",
-#                 reserve = "Reserve",
-#                 slr_rate = "Long-term SLR rate",
-#                 total_SETs = "# SETs total",
-#                 exceeding_confident = "Higher; confident",
-#                 exceeding_not_confident = "Higher; not confident",
-#                 NOT_exceeding_confident = "Lower; confident",
-#                 NOT_exceeding_not_confident = "Lower; not confident",
-#                 not_enough_info = "Not enough data") %>% 
-#         theme_booktabs() %>% 
-#         autofit()
-# try1b <- merge_v(try1, j = ~ Region + reserve)
-# try1b
-```
-
-```{r}
-for_group_table <- as_grouped_data(long_term_slr_comp,
-                                   groups = c("Region"))
-```
 
 # Comparison to local long-term sea level rise  
 
@@ -175,14 +152,20 @@ slr_longterm <- merge_at(slr_longterm, i = 1, j = 6:7, part = "header")
 
 
 std_border = fp_border(color = "gray80", width = 1)
-slr_longterm %>% 
-        theme_zebra() %>% 
-        border_inner_v(part = "all", border = std_border) %>% 
-        border_outer(border = std_border, part = "all") %>% 
-        align(align = "center", part = "all") %>% 
-        align(align = "left", part = "body", i = ~ !is.na(Region)) %>% 
-        autofit()
+slr_longterm <- slr_longterm %>% 
+  theme_zebra() %>% 
+  border_inner_v(part = "all", border = std_border) %>% 
+  border_outer(border = std_border, part = "all") %>% 
+  align(align = "center", part = "all") %>% 
+  align(align = "left", part = "body", i = ~ !is.na(Region)) %>% 
+  width(width = c(0.8, 0.9, rep(0.7, 6)))
+
+slr_longterm
 ```
+
+<br>  
+
+
 
 ```{r, fig.cap = "Figure 1. Proportion of SETs at each participating reserve whose rate of elevation change was greater than (blue) / less than (red) long-term sea level change at a nearby NWLON station. Shading depends on whether confidence intervals overlapped (see text for more detail; dark color = no overlapping of CIs; ligher shading = CIs overlapped)."}
 knitr::include_graphics(here::here("R_output", "figures", "maps", "mapSLR_all.png"))
@@ -226,14 +209,21 @@ yr19_slr <- merge_at(yr19_slr, i = 1, j = 6:7, part = "header")
 
 
 std_border = fp_border(color = "gray80", width = 1)
-yr19_slr %>% 
-        theme_zebra() %>% 
-        border_inner_v(part = "all", border = std_border) %>% 
-        border_outer(border = std_border, part = "all") %>% 
-        align(align = "center", part = "all") %>% 
-        align(align = "left", part = "body", i = ~ !is.na(Region)) %>% 
-        autofit()
+yr19_slr <- yr19_slr %>% 
+  theme_zebra() %>% 
+  border_inner_v(part = "all", border = std_border) %>% 
+  border_outer(border = std_border, part = "all") %>% 
+  align(align = "center", part = "all") %>% 
+  align(align = "left", part = "body", i = ~ !is.na(Region)) %>% 
+  width(width = c(0.8, 0.9, rep(0.7, 6)))
+
+yr19_slr
 ```
+
+
+<br>  
+
+
 
 ```{r, fig.cap = "Figure 2. Proportion of SETs at each participating reserve whose rate of elevation change was greater than (blue) / less than (red) 19-year water level change. Shading depends on whether confidence intervals overlapped (see text for more detail; dark color = no overlapping of CIs; ligher shading = CIs overlapped)."}
 knitr::include_graphics(here::here("R_output", "figures", "maps", "map19yr_all.png"))
