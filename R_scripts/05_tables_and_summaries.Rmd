@@ -49,21 +49,21 @@ Note: GTM is not on the gulf coast, but was grouped with this region for mapping
 ```{r}
 regions <- tribble(
         ~reserve, ~full_name, ~state, ~Region,
-        "APA", "Apalachicola Bay", "FL", "Gulf",
+        "APA", "Apalachicola Bay", "FL", "Gulf and Southeast",
         "CBM", "Chesapeake Bay, MD", "MD", "Mid-Atlantic",
         "CBV", "Chesapeake Bay, VA", "VA", "Mid-Atlantic",
         "DEL", "Delaware", "DE", "Mid-Atlantic",
         "ELK", "Elkhorn Slough", "CA", "West",
-        "GND", "Grand Bay", "MS", "Gulf",
+        "GND", "Grand Bay", "MS", "Gulf and Southeast",
         "GRB", "Great Bay", "NH", "Northeast",
-        "GTM", "Guana Tolomato Matanzas", "FL", "Gulf",
-        "MAR", "Mission Aransas", "TX", "Gulf",
+        "GTM", "Guana Tolomato Matanzas", "FL", "Gulf and Southeast",
+        "MAR", "Mission Aransas", "TX", "Gulf and Southeast",
         "NAR", "Narragansett Bay", "RI", "Northeast",
         "NARUNH", "NAR - Univ of NH partner", "RI", "Northeast",
         "PDB", "Padilla Bay", "WA", "West",
         "SOS", "South Slough", "OR", "West",
         "WEL", "Wells", "ME", "Northeast",
-        "WKB", "Weeks Bay", "AL", "Gulf",
+        "WKB", "Weeks Bay", "AL", "Gulf and Southeast",
         "WQB", "Waquoit Bay", "MA", "Northeast"
 )
 
@@ -289,9 +289,9 @@ Region-level maps will be at the end
 
 ## Region-level maps, long-term SLR  
 
-GTM included in Gulf region even though it's on the east coast because it was the closest grouping (and the latitude matches!)  
 
-```{r, fig.cap = "Figure 3. Gulf region compared to long-term SLR."}
+
+```{r, fig.cap = "Figure 3. Gulf and Southeast region compared to long-term SLR."}
 knitr::include_graphics(here::here("R_output", "figures", "maps", "mapSLR_gulf.png"))
 ```
 
@@ -311,7 +311,7 @@ knitr::include_graphics(here::here("R_output", "figures", "maps", "mapSLR_west.p
 ## Region-level maps, 19-year water level change  
 
 
-```{r, fig.cap = "Figure 7. Gulf region compared to 19-year water level change."}
+```{r, fig.cap = "Figure 7. Gulf and Southeast region compared to 19-year water level change."}
 knitr::include_graphics(here::here("R_output", "figures", "maps", "map19yr_gulf.png"))
 ```
 
