@@ -1,5 +1,5 @@
 ---
-title: "Tables and Summaries"
+title: "National Synthesis of SET data from SETr Project"
 date: "`r Sys.Date()`"
 output:
   word_document: default
@@ -44,7 +44,7 @@ slr_mdat <- read.csv(in_path, stringsAsFactors = FALSE) %>%
 
 # Summary of SETs in this analysis  
 
-Note: GTM is not on the gulf coast, but was grouped with this region for mapping purposes.  
+Sixteen data files from 15 Reserves and partners were submitted, containing data for 187 SETs (Table 1). Criteria for inclusion in this analysis required at least 5 observations over at least 4.5 years to generate an accurate depiction of trend. 146 of the 187 SETs had enough data for these rate calculations. Table 2 represents results of rate calculations; SETs that had too few observations for inclusion are tallied in the column "not enough data".
 
 ```{r}
 regions <- tribble(
@@ -194,8 +194,8 @@ slr_longterm <- as_flextable(for_group_table) %>%
                 NOT_exceeding_confident = "# SETs Lower",
                 NOT_exceeding_not_confident = "# SETs Lower",
                 not_enough_info = "Not enough data")
-slr_longterm <- add_header_row(slr_longterm, values = c("", "long-term", "total", "confident", "not conf.",
-                                  "confident", "not conf.", ""), top = FALSE) %>% 
+slr_longterm <- add_header_row(slr_longterm, values = c("", "long-term", "total", "No CI overlap", "CI overlap",
+                                  "No CI overlap", "CI overlap", ""), top = FALSE) %>% 
         bold(part = "header", bold = TRUE ) %>% 
         fontsize(size = 11, i = 1, part = "header") %>%
         fontsize(size = 10, i = 2, part = "header") %>% 
@@ -251,8 +251,8 @@ yr19_slr <- as_flextable(for_group_table) %>%
                 NOT_exceeding_confident = "# SETs Lower",
                 NOT_exceeding_not_confident = "# SETs Lower",
                 not_enough_info = "Not enough data")
-yr19_slr <- add_header_row(yr19_slr, values = c("", "19-yr rate of change", "total", "confident", "not conf.",
-                                  "confident", "not conf.", ""), top = FALSE) %>% 
+yr19_slr <- add_header_row(yr19_slr, values = c("", "19-yr rate of change", "total", "No CI overlap", "CI overlap",
+                                  "No CI overlap", "CI overlap", ""), top = FALSE) %>% 
         bold(part = "header", bold = TRUE ) %>% 
         fontsize(size = 11, i = 1, part = "header") %>%
         fontsize(size = 10, i = 2, part = "header") %>% 

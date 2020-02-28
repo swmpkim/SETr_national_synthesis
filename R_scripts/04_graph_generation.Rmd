@@ -110,7 +110,7 @@ for(i in seq_along(reserves)){
         # summary plot, not colored by veg
         p <- plot_rate_comps(data = to_plo,
                              plot_type = 4,
-                             set_ids = set_id,
+                             set_ids = graph_set_name,
                              set_ci_low = CI_low,
                              set_ci_high = CI_high,
                              rates = rate,
@@ -138,7 +138,7 @@ for(i in seq_along(reserves)){
         if(!anyNA(to_plo$co_dominant_species1)){
           p <- plot_rate_comps(data = to_plo,
                                plot_type = 4,
-                               set_ids = set_id,
+                               set_ids = graph_set_name,
                                set_ci_low = CI_low,
                                set_ci_high = CI_high,
                                rates = rate,
